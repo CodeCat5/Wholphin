@@ -144,7 +144,12 @@ class RecommendedTvShowViewModel
                     val nextUpItems = nextUpItemsDeferred.await()
 
                     if (combineNextUp) {
-                        val combined = lastestNextUpService.buildCombined(resumeItems, nextUpItems)
+                        val combined =
+                            lastestNextUpService.buildCombined(
+                                resumeItems,
+                                nextUpItems,
+                                preferences.homePagePreferences.dedupeCombinedSeries,
+                            )
                         update(
                             R.string.continue_watching,
                             HomeRowLoadingState.Success(

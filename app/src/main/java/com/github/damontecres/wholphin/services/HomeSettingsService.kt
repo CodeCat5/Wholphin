@@ -634,6 +634,7 @@ class HomeSettingsService
                             latestNextUpService.buildCombined(
                                 resume,
                                 nextUp,
+                                prefs.dedupeCombinedSeries,
                             ),
                         viewOptions = row.viewOptions,
                         rowType = row,

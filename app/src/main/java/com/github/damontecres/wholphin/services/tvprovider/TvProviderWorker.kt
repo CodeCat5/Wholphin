@@ -86,6 +86,7 @@ class TvProviderWorker
                         userId,
                         prefs.homePagePreferences.enableRewatchingNextUp,
                         prefs.homePagePreferences.maxDaysNextUp,
+                        prefs.homePagePreferences.dedupeCombinedSeries,
                     )
                 val potentialItemsToAddIds = potentialItemsToAdd.map { it.id.toString() }
 
@@ -150,6 +151,7 @@ class TvProviderWorker
             userId: UUID,
             enableRewatching: Boolean,
             maxDaysNextUp: Int,
+            dedupeCombinedSeries: Boolean,
         ): List<BaseItem> {
             val resumeItems = latestNextUpService.getResume(userId, 10, true)
             val seriesIds = resumeItems.mapNotNull { it.data.seriesId }
@@ -157,7 +159,7 @@ class TvProviderWorker
                 latestNextUpService
                     .getNextUp(userId, 10, enableRewatching, false, maxDaysNextUp)
                     .filter { it.data.seriesId != null && it.data.seriesId !in seriesIds }
-            return latestNextUpService.buildCombined(resumeItems, nextUpItems)
+            return latestNextUpService.buildCombined(resumeItems, nextUpItems, dedupeCombinedSeries)
         }
 
         private suspend fun getCurrentTvChannelNextUp(): List<WatchNextProgram> =
