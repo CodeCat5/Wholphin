@@ -6,6 +6,7 @@
 package com.github.damontecres.wholphin.services
 
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.dedupeBySeries
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -123,91 +124,67 @@ class LatestNextUpServiceTests {
         }
 
     @Test
-    fun `Test buildCombined dedupes by seriesId keeping most recently played`() =
-        runTest {
-            val resumeId = UUID.randomUUID()
-            val nextUpSameSeriesId = UUID.randomUUID()
-            val nextUpOtherSeriesId = UUID.randomUUID()
-            val movieId = UUID.randomUUID()
+    fun `Test dedupeBySeries drops later episodes from the same series`() {
+        val firstSeriesEpisodeId = UUID.randomUUID()
+        val laterSameSeriesId = UUID.randomUUID()
+        val otherSeriesId = UUID.randomUUID()
 
-            val resumeLastPlayed = LocalDateTime.now().minusDays(1)
-            val nextUpSameSeriesLastPlayed = LocalDateTime.now().minusDays(5)
-            val nextUpOtherSeriesLastPlayed = LocalDateTime.now().minusDays(2)
+        val firstSeriesEpisode =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns firstSeriesEpisodeId
+                every { seriesId } returns seriesId1
+            }
+        val laterSameSeries =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns laterSameSeriesId
+                every { seriesId } returns seriesId1
+            }
+        val otherSeries =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns otherSeriesId
+                every { seriesId } returns seriesId2
+            }
 
-            val resumeEpisode =
-                mockk<BaseItemDto>(relaxed = true) {
-                    every { id } returns resumeId
-                    every { seriesId } returns seriesId1
-                    every { userData } returns testUserItemDataDto.copy(lastPlayedDate = resumeLastPlayed)
-                }
-            val nextUpSameSeries =
-                mockk<BaseItemDto>(relaxed = true) {
-                    every { id } returns nextUpSameSeriesId
-                    every { seriesId } returns seriesId1
-                    every { userData } returns testUserItemDataDto.copy(lastPlayedDate = null)
-                }
-            val nextUpOtherSeries =
-                mockk<BaseItemDto>(relaxed = true) {
-                    every { id } returns nextUpOtherSeriesId
-                    every { seriesId } returns seriesId2
-                    every { userData } returns testUserItemDataDto.copy(lastPlayedDate = null)
-                }
-            val movie =
-                mockk<BaseItemDto>(relaxed = true) {
-                    every { id } returns movieId
-                    every { seriesId } returns null
-                    every { userData } returns testUserItemDataDto.copy(lastPlayedDate = LocalDateTime.now().minusHours(2))
-                }
+        val input =
+            listOf(
+                BaseItem(firstSeriesEpisode),
+                BaseItem(laterSameSeries),
+                BaseItem(otherSeries),
+            )
 
-            val resume = listOf(BaseItem(resumeEpisode), BaseItem(movie))
-            val nextUp = listOf(BaseItem(nextUpSameSeries), BaseItem(nextUpOtherSeries))
-
-            coEvery { mockDatePlayedService.getLastPlayed(match<BaseItem> { it.id == nextUpSameSeriesId }) } returns nextUpSameSeriesLastPlayed
-            coEvery { mockDatePlayedService.getLastPlayed(match<BaseItem> { it.id == nextUpOtherSeriesId }) } returns nextUpOtherSeriesLastPlayed
-
-            val result = latestNextUpService.buildCombined(resume, nextUp, dedupeBySeries = true)
-
-            val resultIds = result.map { it.id }
-            Assert.assertEquals(3, result.size)
-            Assert.assertTrue(resumeId in resultIds)
-            Assert.assertTrue(nextUpOtherSeriesId in resultIds)
-            Assert.assertTrue(movieId in resultIds)
-            Assert.assertTrue("Older Next Up entry for same series should be dropped", nextUpSameSeriesId !in resultIds)
-        }
+        val resultIds = input.dedupeBySeries().map { it.id }
+        Assert.assertEquals(2, resultIds.size)
+        Assert.assertTrue(firstSeriesEpisodeId in resultIds)
+        Assert.assertTrue(otherSeriesId in resultIds)
+        Assert.assertTrue("Later episode for same series should be dropped", laterSameSeriesId !in resultIds)
+    }
 
     @Test
-    fun `Test buildCombined keeps duplicates when dedupeBySeries is disabled`() =
-        runTest {
-            val resumeId = UUID.randomUUID()
-            val nextUpSameSeriesId = UUID.randomUUID()
+    fun `Test dedupeBySeries preserves all episodes when each is from a different series`() {
+        val episode1Id = UUID.randomUUID()
+        val episode2Id = UUID.randomUUID()
+        val episode3Id = UUID.randomUUID()
 
-            val resumeEpisode =
-                mockk<BaseItemDto>(relaxed = true) {
-                    every { id } returns resumeId
-                    every { seriesId } returns seriesId1
-                    every { userData } returns testUserItemDataDto.copy(lastPlayedDate = LocalDateTime.now().minusDays(1))
-                }
-            val nextUpSameSeries =
-                mockk<BaseItemDto>(relaxed = true) {
-                    every { id } returns nextUpSameSeriesId
-                    every { seriesId } returns seriesId1
-                    every { userData } returns testUserItemDataDto.copy(lastPlayedDate = null)
-                }
+        val episode1 =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns episode1Id
+                every { seriesId } returns seriesId1
+            }
+        val episode2 =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns episode2Id
+                every { seriesId } returns seriesId2
+            }
+        val episode3 =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns episode3Id
+                every { seriesId } returns seriesId3
+            }
 
-            val resume = listOf(BaseItem(resumeEpisode))
-            val nextUp = listOf(BaseItem(nextUpSameSeries))
-
-            coEvery {
-                mockDatePlayedService.getLastPlayed(match<BaseItem> { it.id == nextUpSameSeriesId })
-            } returns LocalDateTime.now().minusDays(5)
-
-            val result = latestNextUpService.buildCombined(resume, nextUp, dedupeBySeries = false)
-
-            val resultIds = result.map { it.id }
-            Assert.assertEquals(2, result.size)
-            Assert.assertTrue(resumeId in resultIds)
-            Assert.assertTrue(nextUpSameSeriesId in resultIds)
-        }
+        val input = listOf(BaseItem(episode1), BaseItem(episode2), BaseItem(episode3))
+        val result = input.dedupeBySeries()
+        Assert.assertEquals(input.map { it.id }, result.map { it.id })
+    }
 
     fun buildRemoved(vararg values: Pair<UUID, LocalDateTime>): DisplayPreferencesDto =
         testDisplayPreferencesDto.copy(

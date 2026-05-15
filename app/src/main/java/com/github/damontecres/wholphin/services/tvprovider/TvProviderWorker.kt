@@ -21,6 +21,7 @@ import com.github.damontecres.wholphin.MainActivity
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.preferences.AppPreference
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.services.ImageUrlService
@@ -86,7 +87,7 @@ class TvProviderWorker
                         userId,
                         prefs.homePagePreferences.enableRewatchingNextUp,
                         prefs.homePagePreferences.maxDaysNextUp,
-                        prefs.homePagePreferences.dedupeCombinedSeries,
+                        prefs.interfacePreferences.oneEpisodePerSeries,
                     )
                 val potentialItemsToAddIds = potentialItemsToAdd.map { it.id.toString() }
 
@@ -151,7 +152,7 @@ class TvProviderWorker
             userId: UUID,
             enableRewatching: Boolean,
             maxDaysNextUp: Int,
-            dedupeCombinedSeries: Boolean,
+            oneEpisodePerSeries: Boolean,
         ): List<BaseItem> {
             val resumeItems = latestNextUpService.getResume(userId, 10, true)
             val seriesIds = resumeItems.mapNotNull { it.data.seriesId }
@@ -159,7 +160,9 @@ class TvProviderWorker
                 latestNextUpService
                     .getNextUp(userId, 10, enableRewatching, false, maxDaysNextUp)
                     .filter { it.data.seriesId != null && it.data.seriesId !in seriesIds }
-            return latestNextUpService.buildCombined(resumeItems, nextUpItems, dedupeCombinedSeries)
+            return latestNextUpService
+                .buildCombined(resumeItems, nextUpItems)
+                .maybeDedupeBySeries(oneEpisodePerSeries)
         }
 
         private suspend fun getCurrentTvChannelNextUp(): List<WatchNextProgram> =

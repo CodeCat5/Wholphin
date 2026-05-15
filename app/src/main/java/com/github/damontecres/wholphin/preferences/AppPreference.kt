@@ -214,15 +214,15 @@ sealed interface AppPreference<Pref, T> {
                 summaryOff = R.string.disabled,
             )
 
-        val DedupeCombinedSeries =
+        val OneEpisodePerSeries =
             AppSwitchPreference<AppPreferences>(
-                title = R.string.combine_continue_next_dedupe,
+                title = R.string.one_episode_per_series,
                 defaultValue = false,
-                getter = { it.homePagePreferences.dedupeCombinedSeries },
+                getter = { it.interfacePreferences.oneEpisodePerSeries },
                 setter = { prefs, value ->
-                    prefs.updateHomePagePreferences { dedupeCombinedSeries = value }
+                    prefs.updateInterfacePreferences { oneEpisodePerSeries = value }
                 },
-                summaryOn = R.string.combine_continue_next_dedupe_summary,
+                summaryOn = R.string.enabled,
                 summaryOff = R.string.disabled,
             )
 
@@ -1175,7 +1175,7 @@ val advancedPreferences =
                         AppPreference.ShowLogos,
                         AppPreference.ManageMedia,
                         AppPreference.CombineContinueNext,
-                        AppPreference.DedupeCombinedSeries,
+                        AppPreference.OneEpisodePerSeries,
                         // Temporarily disabled, see https://github.com/damontecres/Wholphin/pull/127#issuecomment-3478058418
 //                    AppPreference.NavDrawerSwitchOnFocus,
                         AppPreference.ControllerTimeout,

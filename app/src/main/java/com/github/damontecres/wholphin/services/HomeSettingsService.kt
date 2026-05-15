@@ -6,6 +6,7 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomePageSettings
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
+import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.data.model.SUPPORTED_HOME_PAGE_SETTINGS_VERSION
 import com.github.damontecres.wholphin.data.model.createGenreDestination
 import com.github.damontecres.wholphin.data.model.createStudioDestination
@@ -572,16 +573,18 @@ class HomeSettingsService
             libraries: List<Library>,
             limit: Int = prefs.maxItemsPerRow,
             isRefresh: Boolean,
+            oneEpisodePerSeries: Boolean = false,
         ): HomeRowLoadingState =
             when (row) {
                 is HomeRowConfig.ContinueWatching -> {
                     val resume =
-                        latestNextUpService.getResume(
-                            userDto.id,
-                            limit,
-                            true,
-                            row.viewOptions.useSeries,
-                        )
+                        latestNextUpService
+                            .getResume(
+                                userDto.id,
+                                limit,
+                                true,
+                                row.viewOptions.useSeries,
+                            ).maybeDedupeBySeries(oneEpisodePerSeries)
 
                     Success(
                         title = context.getString(R.string.continue_watching),
@@ -593,14 +596,15 @@ class HomeSettingsService
 
                 is HomeRowConfig.NextUp -> {
                     val nextUp =
-                        latestNextUpService.getNextUp(
-                            userDto.id,
-                            limit,
-                            prefs.enableRewatchingNextUp,
-                            false,
-                            prefs.maxDaysNextUp,
-                            row.viewOptions.useSeries,
-                        )
+                        latestNextUpService
+                            .getNextUp(
+                                userDto.id,
+                                limit,
+                                prefs.enableRewatchingNextUp,
+                                false,
+                                prefs.maxDaysNextUp,
+                                row.viewOptions.useSeries,
+                            ).maybeDedupeBySeries(oneEpisodePerSeries)
 
                     Success(
                         title = context.getString(R.string.next_up),
@@ -631,11 +635,9 @@ class HomeSettingsService
                     Success(
                         title = context.getString(R.string.continue_watching),
                         items =
-                            latestNextUpService.buildCombined(
-                                resume,
-                                nextUp,
-                                prefs.dedupeCombinedSeries,
-                            ),
+                            latestNextUpService
+                                .buildCombined(resume, nextUp)
+                                .maybeDedupeBySeries(oneEpisodePerSeries),
                         viewOptions = row.viewOptions,
                         rowType = row,
                     )
@@ -771,6 +773,7 @@ class HomeSettingsService
                             .getLatestMedia(request)
                             .content
                             .map { BaseItem.Companion.from(it, api, row.viewOptions.useSeries) }
+                            .maybeDedupeBySeries(oneEpisodePerSeries)
                             .let {
                                 Success(
                                     title,
@@ -804,6 +807,7 @@ class HomeSettingsService
                         .execute(api, request)
                         .content.items
                         .map { BaseItem.Companion.from(it, api, row.viewOptions.useSeries) }
+                        .maybeDedupeBySeries(oneEpisodePerSeries)
                         .let {
                             Success(
                                 title,
@@ -833,6 +837,7 @@ class HomeSettingsService
                         .execute(api, request)
                         .content.items
                         .map { BaseItem(it, row.viewOptions.useSeries) }
+                        .maybeDedupeBySeries(oneEpisodePerSeries)
                         .let {
                             Success(
                                 name ?: context.getString(R.string.collection),
@@ -861,6 +866,7 @@ class HomeSettingsService
                         .execute(api, request)
                         .content.items
                         .map { BaseItem(it, row.viewOptions.useSeries) }
+                        .maybeDedupeBySeries(oneEpisodePerSeries)
                         .let {
                             Success(
                                 row.name,

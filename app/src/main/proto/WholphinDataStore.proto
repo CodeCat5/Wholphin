@@ -94,7 +94,6 @@ message HomePagePreferences{
   bool enable_rewatching_next_up = 2;
   bool combine_continue_next = 3;
   int32 max_days_next_up = 4;
-  bool dedupe_combined_series = 5;
 }
 
 enum ThemeSongVolume {
@@ -185,6 +184,7 @@ message InterfacePreferences {
   bool enable_media_management = 12;
   bool show_logos = 13;
   SearchPreferences search_preferences = 14;
+  bool one_episode_per_series = 15;
 }
 
 message AdvancedPreferences {

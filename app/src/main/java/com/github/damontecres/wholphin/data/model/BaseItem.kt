@@ -313,3 +313,9 @@ fun createStudioDestination(
 )
 
 val BaseItem.studioNames get() = data.studios?.mapNotNull { it.name }.orEmpty()
+
+fun List<BaseItem>.dedupeBySeries(): List<BaseItem> =
+    distinctBy { it.data.seriesId ?: it.id }
+
+fun List<BaseItem>.maybeDedupeBySeries(enabled: Boolean): List<BaseItem> =
+    if (enabled) dedupeBySeries() else this

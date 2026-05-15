@@ -140,7 +140,6 @@ class LatestNextUpService
         suspend fun buildCombined(
             resume: List<BaseItem>,
             nextUp: List<BaseItem>,
-            dedupeBySeries: Boolean = false,
         ): List<BaseItem> =
             withContext(Dispatchers.IO) {
                 val start = System.currentTimeMillis()
@@ -165,13 +164,7 @@ class LatestNextUpService
                 val timestamps = mutableMapOf<UUID, LocalDateTime?>()
                 nextUp.map { it.id }.zip(nextUpLastPlayed).toMap(timestamps)
                 resume.forEach { timestamps[it.id] = it.data.userData?.lastPlayedDate }
-                val sorted = (resume + nextUp).sortedByDescending { timestamps[it.id] }
-                val result =
-                    if (dedupeBySeries) {
-                        sorted.distinctBy { it.data.seriesId ?: it.id }
-                    } else {
-                        sorted
-                    }
+                val result = (resume + nextUp).sortedByDescending { timestamps[it.id] }
                 val duration = (System.currentTimeMillis() - start).milliseconds
                 Timber.v("buildCombined took %s", duration)
                 return@withContext result

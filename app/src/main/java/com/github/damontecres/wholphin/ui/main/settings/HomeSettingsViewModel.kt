@@ -119,7 +119,9 @@ class HomeSettingsViewModel
             val semaphore = Semaphore(4)
             val rows =
                 serverRepository.currentUserDto.value?.let { userDto ->
-                    val prefs = userPreferencesService.getCurrent().appPreferences.homePagePreferences
+                    val appPrefs = userPreferencesService.getCurrent().appPreferences
+                    val prefs = appPrefs.homePagePreferences
+                    val oneEpisodePerSeries = appPrefs.interfacePreferences.oneEpisodePerSeries
                     state.value
                         .let { state ->
                             state.rows
@@ -135,6 +137,7 @@ class HomeSettingsViewModel
                                                     libraries = state.libraries,
                                                     limit = limit,
                                                     isRefresh = false,
+                                                    oneEpisodePerSeries = oneEpisodePerSeries,
                                                 )
                                             } catch (ex: Exception) {
                                                 Timber.e(ex, "Error on row %s", row)

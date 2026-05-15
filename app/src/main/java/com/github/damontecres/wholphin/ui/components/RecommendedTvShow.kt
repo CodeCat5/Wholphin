@@ -9,6 +9,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.ServerRepository
+import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.BackdropService
@@ -102,6 +103,7 @@ class RecommendedTvShowViewModel
                     preferencesDataStore.data.firstOrNull() ?: AppPreferences.getDefaultInstance()
                 val combineNextUp = preferences.homePagePreferences.combineContinueNext
                 val itemsPerRow = preferences.homePagePreferences.maxItemsPerRow
+                val oneEpisodePerSeries = preferences.interfacePreferences.oneEpisodePerSeries
                 val userId = serverRepository.currentUser.value?.id
                 try {
                     val resumeItemsDeferred =
@@ -145,11 +147,9 @@ class RecommendedTvShowViewModel
 
                     if (combineNextUp) {
                         val combined =
-                            lastestNextUpService.buildCombined(
-                                resumeItems,
-                                nextUpItems,
-                                preferences.homePagePreferences.dedupeCombinedSeries,
-                            )
+                            lastestNextUpService
+                                .buildCombined(resumeItems, nextUpItems)
+                                .maybeDedupeBySeries(oneEpisodePerSeries)
                         update(
                             R.string.continue_watching,
                             HomeRowLoadingState.Success(
@@ -166,12 +166,15 @@ class RecommendedTvShowViewModel
                             R.string.continue_watching,
                             HomeRowLoadingState.Success(
                                 context.getString(R.string.continue_watching),
-                                resumeItems,
+                                resumeItems.maybeDedupeBySeries(oneEpisodePerSeries),
                             ),
                         )
                         update(
                             R.string.next_up,
-                            HomeRowLoadingState.Success(context.getString(R.string.next_up), nextUpItems),
+                            HomeRowLoadingState.Success(
+                                context.getString(R.string.next_up),
+                                nextUpItems.maybeDedupeBySeries(oneEpisodePerSeries),
+                            ),
                         )
                     }
 
@@ -201,7 +204,10 @@ class RecommendedTvShowViewModel
                             limit = itemsPerRow,
                             enableTotalRecordCount = false,
                         )
-                    GetItemsRequestHandler.execute(api, request).toBaseItems(api, true)
+                    GetItemsRequestHandler
+                        .execute(api, request)
+                        .toBaseItems(api, true)
+                        .maybeDedupeBySeries(oneEpisodePerSeries)
                 }.also(jobs::add)
 
                 update(R.string.recently_added) {
@@ -218,7 +224,10 @@ class RecommendedTvShowViewModel
                             limit = itemsPerRow,
                             enableTotalRecordCount = false,
                         )
-                    GetItemsRequestHandler.execute(api, request).toBaseItems(api, true)
+                    GetItemsRequestHandler
+                        .execute(api, request)
+                        .toBaseItems(api, true)
+                        .maybeDedupeBySeries(oneEpisodePerSeries)
                 }.also(jobs::add)
 
                 update(R.string.top_unwatched) {

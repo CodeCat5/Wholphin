@@ -77,6 +77,8 @@ class HomeViewModel
                 try {
                     val preferences = userPreferencesService.getCurrent()
                     val prefs = preferences.appPreferences.homePagePreferences
+                    val oneEpisodePerSeries =
+                        preferences.appPreferences.interfacePreferences.oneEpisodePerSeries
 
                     serverRepository.currentUserDto.value?.let { userDto ->
                         val libraries =
@@ -125,6 +127,7 @@ class HomeViewModel
                                                     libraries = libraries,
                                                     limit = prefs.maxItemsPerRow,
                                                     isRefresh = refresh,
+                                                    oneEpisodePerSeries = oneEpisodePerSeries,
                                                 )
                                             } catch (ex: Exception) {
                                                 Timber.e(ex, "Error on row %s", row)
