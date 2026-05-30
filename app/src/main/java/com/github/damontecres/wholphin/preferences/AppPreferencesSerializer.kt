@@ -85,7 +85,6 @@ class AppPreferencesSerializer
                             .apply {
                                 maxItemsPerRow = AppPreference.HomePageItems.defaultValue.toInt()
                                 enableRewatchingNextUp = AppPreference.RewatchNextUp.defaultValue
-                                combineContinueNext = AppPreference.CombineContinueNext.defaultValue
                                 maxDaysNextUp = AppPreference.MaxDaysNextUp.defaultValue.toInt()
                             }.build()
                     interfacePreferences =
@@ -100,12 +99,15 @@ class AppPreferencesSerializer
                                 backdropStyle = AppPreference.BackdropStylePref.defaultValue
                                 showLogos = AppPreference.ShowLogos.defaultValue
                                 oneEpisodePerSeries = AppPreference.OneEpisodePerSeries.defaultValue
+                                clearDisplayToggles()
+                                addAllDisplayToggles(AppPreference.DisplayTogglesPref.defaultValue)
 
                                 searchPreferences =
                                     SearchPreferences
                                         .newBuilder()
                                         .apply {
                                             combinedSearchResults = false
+                                            showVoiceSearchButton = true
                                         }.build()
 
                                 subtitlesPreferences =

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -l \"GetItemsRequest\\\\|GetResumeItems\\\\|GetNextUp\")",
+      "Bash(grep -rn *)",
+      "Bash(git add *)",
+      "Bash(./gradlew compileDebugKotlin -q)"
+    ]
+  }
+}

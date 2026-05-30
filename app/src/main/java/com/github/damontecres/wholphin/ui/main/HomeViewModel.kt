@@ -24,6 +24,7 @@ import com.github.damontecres.wholphin.ui.data.RowColumn
 import com.github.damontecres.wholphin.ui.launchDefault
 import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.ui.showToast
+import com.github.damontecres.wholphin.ui.util.EmptyStringProvider
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.HomeRowLoadingState
 import com.github.damontecres.wholphin.util.LoadingState
@@ -80,7 +81,7 @@ class HomeViewModel
                     val oneEpisodePerSeries =
                         preferences.appPreferences.interfacePreferences.oneEpisodePerSeries
 
-                    serverRepository.currentUserDto.value?.let { userDto ->
+                    serverRepository.currentUserDto?.let { userDto ->
                         val libraries =
                             navDrawerService.getAllUserLibraries(userDto.id, userDto.tvAccess)
                         val settings =
@@ -105,7 +106,9 @@ class HomeViewModel
                                     if (refresh) {
                                         it.homeRows
                                     } else {
-                                        List(settings.rows.size) { HomeRowLoadingState.Pending("") }
+                                        List(settings.rows.size) {
+                                            HomeRowLoadingState.Pending(EmptyStringProvider)
+                                        }
                                     },
                             )
                         }
@@ -256,7 +259,7 @@ class HomeViewModel
         fun removeFromNextUp(item: BaseItem) {
             if (item.type == BaseItemKind.EPISODE) {
                 viewModelScope.launchDefault {
-                    serverRepository.currentUser.value?.id?.let { userId ->
+                    serverRepository.currentUser?.id?.let { userId ->
                         latestNextUpService.removeFromNextUp(userId, item)
                         init()
                     }
