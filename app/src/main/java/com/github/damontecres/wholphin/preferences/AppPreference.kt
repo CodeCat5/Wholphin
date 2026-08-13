@@ -1202,7 +1202,6 @@ val advancedPreferences =
                         AppPreference.BackdropStylePref,
                         AppPreference.ShowLogos,
                         AppPreference.ManageMedia,
-                        AppPreference.CombineContinueNext,
                         AppPreference.OneEpisodePerSeries,
                         AppPreference.DisplayTogglesPref,
                         // Temporarily disabled, see https://github.com/damontecres/Wholphin/pull/127#issuecomment-3478058418

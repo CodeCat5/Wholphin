@@ -17,6 +17,7 @@ import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomeRowViewOptions
+import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.BackdropService
@@ -102,10 +103,12 @@ class RecommendedViewModel
 
         fun init() {
             viewModelScope.launchDefault {
-                val limit =
+                val appPreferences =
                     userPreferencesService.flow
                         .first()
-                        .appPreferences.homePagePreferences.maxItemsPerRow
+                        .appPreferences
+                val limit = appPreferences.homePagePreferences.maxItemsPerRow
+                val oneEpisodePerSeries = appPreferences.interfacePreferences.oneEpisodePerSeries
                 _state.update {
                     it.copy(
                         loading = LoadingState.Loading,
@@ -122,7 +125,7 @@ class RecommendedViewModel
                                 try {
                                     HomeRowLoadingState.Success(
                                         title,
-                                        execute(row, limit),
+                                        execute(row, limit, oneEpisodePerSeries),
                                         viewOptions,
                                     )
                                 } catch (ex: Exception) {
@@ -154,12 +157,14 @@ class RecommendedViewModel
         private suspend fun <T> execute(
             row: RecommendedRow<T>,
             limit: Int?,
+            oneEpisodePerSeries: Boolean,
         ): List<BaseItem?> =
             if (limit != null) {
                 val request = row.handler.prepare(row.request, 0, limit, false)
                 row.handler
                     .execute(api, request)
                     .toBaseItems(api, true)
+                    .maybeDedupeBySeries(oneEpisodePerSeries && row.dedupeBySeries)
             } else {
                 ApiRequestPager(
                     api,
@@ -336,6 +341,7 @@ data class RecommendedRow<T>(
     val title: Int,
     val handler: RequestHandler<T>,
     val request: T,
+    val dedupeBySeries: Boolean = false,
 )
 
 @Composable
