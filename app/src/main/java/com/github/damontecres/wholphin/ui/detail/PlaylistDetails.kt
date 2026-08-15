@@ -3,7 +3,6 @@ package com.github.damontecres.wholphin.ui.detail
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +41,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,6 +64,7 @@ import com.github.damontecres.wholphin.data.model.LibraryDisplayInfo
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
+import com.github.damontecres.wholphin.services.FilterOptionCache
 import com.github.damontecres.wholphin.services.MediaManagementService
 import com.github.damontecres.wholphin.services.MediaReportService
 import com.github.damontecres.wholphin.services.MusicService
@@ -79,6 +80,7 @@ import com.github.damontecres.wholphin.ui.components.ErrorMessage
 import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.ExpandablePlayButton
 import com.github.damontecres.wholphin.ui.components.FilterByButton
+import com.github.damontecres.wholphin.ui.components.GridTitle
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.MusicContextActions
 import com.github.damontecres.wholphin.ui.components.Optional
@@ -93,26 +95,27 @@ import com.github.damontecres.wholphin.ui.detail.music.MusicViewModel
 import com.github.damontecres.wholphin.ui.enableMarquee
 import com.github.damontecres.wholphin.ui.equalsNotNull
 import com.github.damontecres.wholphin.ui.formatDateTime
-import com.github.damontecres.wholphin.ui.getTimeFormatter
+import com.github.damontecres.wholphin.ui.formatDuration
+import com.github.damontecres.wholphin.ui.formatTime
 import com.github.damontecres.wholphin.ui.ifElse
 import com.github.damontecres.wholphin.ui.launchDefault
 import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.roundMinutes
+import com.github.damontecres.wholphin.ui.roundSeconds
 import com.github.damontecres.wholphin.ui.toServerString
 import com.github.damontecres.wholphin.ui.tryRequestFocus
-import com.github.damontecres.wholphin.ui.util.FilterUtils
 import com.github.damontecres.wholphin.ui.util.LocalClock
 import com.github.damontecres.wholphin.util.ApiRequestPager
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.GetItemsRequestHandler
 import com.github.damontecres.wholphin.util.LoadingState
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -142,6 +145,7 @@ class PlaylistViewModel
         private val libraryDisplayInfoDao: LibraryDisplayInfoDao,
         private val favoriteWatchManager: FavoriteWatchManager,
         private val mediaReportService: MediaReportService,
+        private val filterOptionCache: FilterOptionCache,
         @Assisted itemId: UUID,
     ) : MusicViewModel(itemId, context, api, musicService, navigationManager, mediaManagementService) {
         @AssistedFactory
@@ -301,9 +305,7 @@ class PlaylistViewModel
         }
 
         suspend fun getFilterOptionValues(filterOption: ItemFilterBy<*>): List<FilterValueOption> =
-            FilterUtils.getFilterOptionValues(
-                api,
-                serverRepository.currentUser?.id,
+            filterOptionCache.getFilterOptionValues(
                 itemId,
                 filterOption,
             )
@@ -317,14 +319,14 @@ class PlaylistViewModel
         fun setWatched(
             itemId: UUID,
             played: Boolean,
-        ) = viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+        ) = viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
             favoriteWatchManager.setWatched(itemId, played)
         }
 
         fun setFavorite(
             itemId: UUID,
             favorite: Boolean,
-        ) = viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+        ) = viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
             favoriteWatchManager.setFavorite(itemId, favorite)
         }
 
@@ -366,7 +368,6 @@ fun PlaylistDetails(
         ),
     addToPlaylistViewModel: AddPlaylistViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     val musicState by viewModel.musicState.collectAsState()
 
@@ -404,19 +405,21 @@ fun PlaylistDetails(
         }
     }
     val musicContextActions =
-        MusicContextActions(
-            navigateTo = { viewModel.navigationManager.navigateTo(it) },
-            onClickPlay = { index, item -> play(index, item, false, MediaType.AUDIO) },
-            onClickPlayNext = { index, item -> viewModel.playNext(item) },
-            onClickAddToQueue = { item -> viewModel.addToQueue(item, Int.MAX_VALUE) },
-            onClickFavorite = { id, favorite -> viewModel.setFavorite(id, favorite) },
-            onClickAddPlaylist = { itemId ->
-                addToPlaylistViewModel.loadPlaylists(MediaType.AUDIO)
-                showPlaylistDialog.makePresent(itemId)
-            },
-            onClickRemoveFromQueue = { _, _ -> },
-            onDeleteItem = viewModel::deleteItem,
-        )
+        remember {
+            MusicContextActions(
+                navigateTo = { viewModel.navigationManager.navigateTo(it) },
+                onClickPlay = { index, item -> play(index, item, false, MediaType.AUDIO) },
+                onClickPlayNext = { index, item -> viewModel.playNext(item) },
+                onClickAddToQueue = { item -> viewModel.addToQueue(item, Int.MAX_VALUE) },
+                onClickFavorite = { id, favorite -> viewModel.setFavorite(id, favorite) },
+                onClickAddPlaylist = { itemId ->
+                    addToPlaylistViewModel.loadPlaylists()
+                    showPlaylistDialog.makePresent(itemId)
+                },
+                onClickRemoveFromQueue = { _, _ -> },
+                onDeleteItem = viewModel::deleteItem,
+            )
+        }
     val contextActions =
         remember {
             ContextMenuActions(
@@ -424,7 +427,7 @@ fun PlaylistDetails(
                 onClickWatch = { id, watched -> viewModel.setWatched(id, watched) },
                 onClickFavorite = { id, favorite -> viewModel.setFavorite(id, favorite) },
                 onClickAddPlaylist = { itemId ->
-                    addToPlaylistViewModel.loadPlaylists(MediaType.VIDEO)
+                    addToPlaylistViewModel.loadPlaylists()
                     showPlaylistDialog.makePresent(itemId)
                 },
                 onSendMediaInfo = viewModel::sendMediaReport,
@@ -510,6 +513,7 @@ fun PlaylistDetails(
                 addToPlaylistViewModel.createPlaylistAndAddItem(it, itemId)
                 showPlaylistDialog.makeAbsent()
             },
+            onSearch = addToPlaylistViewModel::loadPlaylists,
             elevation = 3.dp,
         )
     }
@@ -532,7 +536,6 @@ fun PlaylistDetailsContent(
 ) {
     var savedIndex by rememberSaveable { mutableIntStateOf(0) }
     var focusedIndex by remember { mutableIntStateOf(savedIndex) }
-    val focus = remember { FocusRequester() }
     val focusedItem = items.getOrNull(focusedIndex)
     LaunchedEffect(focusedItem) {
         focusedItem?.let(onChangeBackdrop)
@@ -553,9 +556,15 @@ fun PlaylistDetailsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier =
                 Modifier
-                    .padding(top = 16.dp)
                     .fillMaxSize(),
         ) {
+            val title =
+                if (loadingState is LoadingState.Success) {
+                    playlist?.name ?: stringResource(R.string.playlist)
+                } else {
+                    ""
+                }
+            GridTitle(title)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                 modifier =
@@ -575,115 +584,28 @@ fun PlaylistDetailsContent(
                             .padding(top = 80.dp)
                             .fillMaxWidth(.25f),
                 )
-                when (loadingState) {
-                    is LoadingState.Error -> {
-                        ErrorMessage(loadingState, modifier)
-                    }
-
-                    LoadingState.Pending, LoadingState.Loading -> {
-                        LoadingPage(modifier)
-                    }
-
-                    LoadingState.Success -> {
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
-                        ) {
-                            Text(
-                                text = playlist?.name ?: stringResource(R.string.playlist),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                style = MaterialTheme.typography.displayMedium,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            if (items.isNotEmpty()) {
-                                LazyColumn(
-                                    contentPadding = PaddingValues(8.dp),
-                                    modifier =
-                                        Modifier
-                                            .padding(bottom = 32.dp)
-                                            .fillMaxHeight()
-//                            .fillMaxWidth(.8f)
-                                            .weight(1f)
-                                            .background(
-                                                MaterialTheme.colorScheme
-                                                    .surfaceColorAtElevation(1.dp)
-                                                    .copy(alpha = .75f),
-                                                shape = RoundedCornerShape(16.dp),
-                                            ).focusProperties {
-                                                onExit = {
-                                                    playButtonFocusRequester.tryRequestFocus()
-                                                }
-                                            }.focusRequester(focusRequester)
-                                            .focusGroup()
-                                            .focusRestorer(focus),
-                                ) {
-                                    itemsIndexed(items) { index, item ->
-                                        PlaylistItem(
-                                            item = item,
-                                            index = index,
-                                            onClick = {
-                                                savedIndex = index
-                                                item?.let {
-                                                    onClickIndex.invoke(index, item)
-                                                }
-                                            },
-                                            onLongClick = {
-                                                savedIndex = index
-                                                item?.let {
-                                                    onLongClickIndex.invoke(index, item)
-                                                }
-                                            },
-                                            isPlaying =
-                                                equalsNotNull(
-                                                    musicState.currentItemId,
-                                                    item?.id,
-                                                ),
-                                            isQueued = item?.id in musicState.queuedIds,
-                                            modifier =
-                                                Modifier
-                                                    .ifElse(
-                                                        item?.type != BaseItemKind.AUDIO,
-                                                        Modifier.height(80.dp),
-                                                    ).ifElse(
-                                                        index == savedIndex,
-                                                        Modifier.focusRequester(focus),
-                                                    ).onFocusChanged {
-                                                        if (it.isFocused) {
-                                                            focusedIndex = index
-                                                        }
-                                                    }.focusProperties {
-                                                        left = playButtonFocusRequester
-                                                        previous = playButtonFocusRequester
-                                                    },
-                                        )
-                                    }
-                                }
-                            } else {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.no_results),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        textAlign = TextAlign.Center,
-                                        modifier =
-                                            Modifier
-                                                .focusProperties {
-                                                    onExit = {
-                                                        playButtonFocusRequester.tryRequestFocus()
-                                                    }
-                                                }.focusRequester(focusRequester)
-                                                .focusable(),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                PlaylistItems(
+                    loadingState = loadingState,
+                    items = items,
+                    musicState = musicState,
+                    playButtonFocusRequester = playButtonFocusRequester,
+                    onFocusItem = { index, item ->
+                        focusedIndex = index
+                    },
+                    onClickItem = { index, item ->
+                        savedIndex = index
+                        item?.let { onClickIndex.invoke(index, item) }
+                    },
+                    onLongClickItem = { index, item ->
+                        savedIndex = index
+                        item?.let { onLongClickIndex.invoke(index, item) }
+                    },
+                    modifier =
+                        Modifier
+                            .padding(horizontal = 16.dp)
+                            .weight(1f)
+                            .focusRequester(focusRequester),
+                )
             }
         }
     }
@@ -770,6 +692,97 @@ fun PlaylistDetailsHeader(
 }
 
 @Composable
+fun PlaylistItems(
+    loadingState: LoadingState,
+    items: List<BaseItem?>,
+    musicState: MusicServiceState,
+    playButtonFocusRequester: FocusRequester,
+    onFocusItem: (Int, BaseItem?) -> Unit,
+    onClickItem: (Int, BaseItem?) -> Unit,
+    onLongClickItem: (Int, BaseItem?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (loadingState) {
+        is LoadingState.Error -> {
+            ErrorMessage(loadingState, modifier)
+        }
+
+        LoadingState.Pending, LoadingState.Loading -> {
+            LoadingPage(modifier)
+        }
+
+        LoadingState.Success -> {
+            if (items.isNotEmpty()) {
+                LazyColumn(
+                    contentPadding = PaddingValues(8.dp),
+                    modifier =
+                        modifier
+                            .padding(bottom = 32.dp)
+                            .fillMaxHeight()
+                            .background(
+                                MaterialTheme.colorScheme
+                                    .surfaceColorAtElevation(1.dp)
+                                    .copy(alpha = .75f),
+                                shape = RoundedCornerShape(16.dp),
+                            ).focusProperties {
+                                left = playButtonFocusRequester
+                                previous = playButtonFocusRequester
+                            }.focusGroup()
+                            .focusRestorer(),
+                ) {
+                    itemsIndexed(items) { index, item ->
+                        PlaylistItem(
+                            item = item,
+                            index = index,
+                            onClick = {
+                                onClickItem.invoke(index, item)
+                            },
+                            onLongClick = {
+                                onLongClickItem.invoke(index, item)
+                            },
+                            isPlaying =
+                                equalsNotNull(
+                                    musicState.currentItemId,
+                                    item?.id,
+                                ),
+                            isQueued = item?.id in musicState.queuedIds,
+                            modifier =
+                                Modifier
+                                    .ifElse(
+                                        item?.type != BaseItemKind.AUDIO,
+                                        Modifier.height(80.dp),
+                                    ).onFocusChanged {
+                                        if (it.isFocused) {
+                                            onFocusItem(index, item)
+                                        }
+                                    }.focusProperties {
+                                        left = playButtonFocusRequester
+                                        previous = playButtonFocusRequester
+                                    },
+                        )
+                    }
+                }
+            } else {
+                LaunchedEffect(Unit) {
+                    playButtonFocusRequester.tryRequestFocus()
+                }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.no_results),
+                        style = MaterialTheme.typography.titleLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun PlaylistItem(
     item: BaseItem?,
     index: Int,
@@ -783,7 +796,7 @@ fun PlaylistItem(
     val focused by interactionSource.collectIsFocusedAsState()
     val imageWidth = 160.dp
     val density = LocalDensity.current
-    val imageWidthPx = remember(imageWidth) { with(density) { imageWidth.roundToPx() } }
+    val imageWidthPx = remember(imageWidth, density) { with(density) { imageWidth.roundToPx() } }
     ListItem(
         selected = false,
         onClick = onClick,
@@ -802,18 +815,38 @@ fun PlaylistItem(
             )
         },
         trailingContent = {
-            item?.data?.runTimeTicks?.ticks?.roundMinutes?.let { duration ->
-                val now by LocalClock.current.now
-                val endTimeStr =
-                    remember(item, now) {
-                        val endTime = now.toLocalTime().plusSeconds(duration.inWholeSeconds)
-                        getTimeFormatter().format(endTime)
+            val duration =
+                when (item?.type) {
+                    BaseItemKind.AUDIO -> {
+                        item.data.runTimeTicks
+                            ?.ticks
+                            ?.roundSeconds
                     }
+
+                    else -> {
+                        item
+                            ?.data
+                            ?.runTimeTicks
+                            ?.ticks
+                            ?.roundMinutes
+                    }
+                }
+            duration?.let { duration ->
+                val now by LocalClock.current.now
+                val context = LocalContext.current
+                val endTimeStr =
+                    remember(item, now, context) {
+                        val endTime = now.toLocalTime().plusSeconds(duration.inWholeSeconds)
+                        formatTime(context, endTime)
+                    }
+                val resources = LocalResources.current
+                val durationText =
+                    remember(resources, duration) { resources.formatDuration(duration) }
                 Column {
                     Text(
-                        text = duration.toString(),
+                        text = durationText,
                     )
-                    if (item.type != BaseItemKind.AUDIO) {
+                    if (item?.type != BaseItemKind.AUDIO) {
                         Text(
                             text = stringResource(R.string.ends_at, endTimeStr),
                             style = MaterialTheme.typography.bodySmall,

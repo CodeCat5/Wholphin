@@ -73,7 +73,7 @@ import com.github.damontecres.wholphin.ui.playback.isForwardButton
 import com.github.damontecres.wholphin.ui.playback.isPlayKeyUp
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.ExceptionHandler
-import kotlinx.coroutines.Dispatchers
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -141,7 +141,7 @@ fun <T : CardGridItem> CardGrid(
             { index: Int ->
                 if (DEBUG) Timber.v("focusOn: focusedIndex=$currentFocusedIndex, index=$index")
                 if (index != currentFocusedIndex) {
-                    previouslyFocusedIndex = focusedIndex
+                    previouslyFocusedIndex = currentFocusedIndex
                 }
                 focusedIndex = index
             }
@@ -217,7 +217,7 @@ fun <T : CardGridItem> CardGrid(
             { letter: Char ->
                 scope.launch(ExceptionHandler()) {
                     val jumpPosition =
-                        withContext(Dispatchers.IO) {
+                        withContext(WholphinDispatchers.IO) {
                             letterPosition.invoke(letter)
                         }
                     Timber.d("Alphabet jump to $jumpPosition")
@@ -257,10 +257,11 @@ fun <T : CardGridItem> CardGrid(
                             val newPosition = previouslyFocusedIndex
                             if (DEBUG) Timber.d("Back long pressed: newPosition=$newPosition")
                             if (newPosition > 0) {
-                                focusOn(newPosition)
                                 scope.launch(ExceptionHandler()) {
-                                    gridState.scrollToItem(newPosition, -columns)
-                                    firstFocus.tryRequestFocus()
+                                    pager.getOrNull(newPosition)
+                                    gridState.scrollToItem(newPosition)
+                                    focusOn(newPosition)
+                                    alphabetFocus = true
                                 }
                             }
                             return@onKeyEvent true
@@ -344,7 +345,7 @@ fun <T : CardGridItem> CardGrid(
                         items(pager.size) { index ->
                             val item = pager[index]
                             val details =
-                                remember(index, item) {
+                                remember(index, item, cardWidthPx, columns) {
                                     val mod =
                                         if ((index == currentFocusedIndex) or (currentFocusedIndex < 0 && index == 0)) {
                                             if (DEBUG) Timber.d("Adding firstFocus to focusedIndex $index")
@@ -514,7 +515,7 @@ fun AlphabetButtons(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    val index = letters.indexOf(currentLetter)
+    val index = remember(letters, currentLetter) { letters.indexOf(currentLetter) }
     LaunchedEffect(currentLetter) {
         scope.launch(ExceptionHandler()) {
             val firstVisibleItemIndex = listState.firstVisibleItemIndex
@@ -522,7 +523,7 @@ fun AlphabetButtons(
                 listState.layoutInfo.visibleItemsInfo
                     .lastOrNull()
                     ?.index ?: -1
-            if (index !in firstVisibleItemIndex..lastVisibleItemIndex) {
+            if (index >= 0 && index !in firstVisibleItemIndex..lastVisibleItemIndex) {
                 listState.animateScrollToItem(index)
             }
         }

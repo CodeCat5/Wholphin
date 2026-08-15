@@ -55,6 +55,7 @@ class AppPreferencesSerializer
                                     AppPreference.RefreshRateSwitching.defaultValue
                                 resolutionSwitching = AppPreference.ResolutionSwitching.defaultValue
                                 cinemaMode = AppPreference.CinemaMode.defaultValue
+                                dpadSeekMode = AppPreference.DpadSeekModePref.defaultValue
 
                                 overrides =
                                     PlaybackOverrides
@@ -175,6 +176,16 @@ class AppPreferencesSerializer
                                 showLyrics = true
                                 showAlbumArt = true
                             }.build()
+
+                    experimentalPreferences =
+                        ExperimentalPreferences
+                            .newBuilder()
+                            .apply {
+                                enabled = false
+                                videoTunnelingEnabled = false
+                                preferAc3Surround = ExperimentalPreference.PreferAc3ForSurround.defaultValue
+                                disableAudioOffload = ExperimentalPreference.DisableAudioOffload.defaultValue
+                            }.build()
                 }.build()
 
         override suspend fun readFrom(input: InputStream): AppPreferences {
@@ -251,6 +262,11 @@ inline fun AppPreferences.updateScreensaverPreferences(block: ScreensaverPrefere
 inline fun AppPreferences.updateMusicPreferences(block: MusicPreferences.Builder.() -> Unit): AppPreferences =
     update {
         musicPreferences = musicPreferences.toBuilder().apply(block).build()
+    }
+
+inline fun AppPreferences.updateExperimentalPreferences(block: ExperimentalPreferences.Builder.() -> Unit): AppPreferences =
+    update {
+        experimentalPreferences = experimentalPreferences.toBuilder().apply(block).build()
     }
 
 fun SubtitlePreferences.Builder.resetSubtitles() {

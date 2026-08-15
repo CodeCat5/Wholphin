@@ -31,7 +31,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.Chapter
-import com.github.damontecres.wholphin.data.model.Playlist
 import com.github.damontecres.wholphin.ui.cards.ChapterCard
 import com.github.damontecres.wholphin.ui.components.HiddenFocusBox
 import com.github.damontecres.wholphin.ui.ifElse
@@ -44,8 +43,7 @@ fun ChapterRowOverlay(
     player: Player,
     controllerViewState: ControllerViewState,
     chapters: List<Chapter>,
-    playlist: Playlist,
-    aspectRatio: Float,
+    hasNext: Boolean,
     onChangeState: (OverlayViewState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -116,10 +114,7 @@ fun ChapterRowOverlay(
                     if (isFocused) controllerViewState.pulseControls()
                 }
                 ChapterCard(
-                    name = chapter.name,
-                    position = chapter.position,
-                    imageUrl = chapter.imageUrl,
-                    aspectRatio = aspectRatio,
+                    chapter = chapter,
                     onClick = {
                         player.seekTo(chapter.position.inWholeMilliseconds)
                         controllerViewState.hideControls()
@@ -147,7 +142,7 @@ fun ChapterRowOverlay(
                 )
             }
         }
-        if (playlist.hasNext()) {
+        if (hasNext) {
             Text(
                 text = stringResource(R.string.queue),
                 style = MaterialTheme.typography.titleLarge,

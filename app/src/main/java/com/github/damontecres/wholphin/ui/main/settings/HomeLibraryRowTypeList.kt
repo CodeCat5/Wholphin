@@ -1,12 +1,9 @@
 package com.github.damontecres.wholphin.ui.main.settings
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,7 +13,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
@@ -36,9 +32,7 @@ fun HomeLibraryRowTypeList(
     LaunchedEffect(Unit) { firstFocus.tryRequestFocus() }
     Column(modifier = modifier) {
         TitleText(stringResource(R.string.add_row_for, library.name))
-        LazyColumn(
-            contentPadding = PaddingValues(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        HomeSettingsLazyColumn(
             modifier =
                 modifier
                     .fillMaxHeight()
@@ -136,7 +130,7 @@ enum class LibraryRowType(
     GENRES(R.string.genres),
     STUDIOS(R.string.studios),
     TV_CHANNELS(R.string.channels),
-    TV_PROGRAMS(R.string.live_tv),
+    TV_PROGRAMS(R.string.watch_live),
     RECENTLY_RECORDED(R.string.recently_recorded),
     COLLECTION(R.string.collection),
     PLAYLIST(R.string.playlist),

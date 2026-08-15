@@ -53,8 +53,6 @@ fun ViewMoreCard(
     showTitle: Boolean = true,
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
-    val spaceBetween by animateDpAsState(if (focused) 12.dp else 4.dp)
-    val spaceBelow by animateDpAsState(if (focused) 4.dp else 12.dp)
     var focusedAfterDelay by remember { mutableStateOf(false) }
 
     val hideOverlayDelay = 500L
@@ -79,7 +77,7 @@ fun ViewMoreCard(
             size.height.takeIf { it.isSpecified } ?: (size.height * (1f / aspectRatio.ratio))
         }
     Column(
-        verticalArrangement = Arrangement.spacedBy(spaceBetween),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = modifier,
     ) {
         Card(
@@ -95,24 +93,20 @@ fun ViewMoreCard(
                     containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
                 ),
         ) {
-            Box {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            ) {
                 Icon(
                     imageVector = Icons.Default.ArrowForward,
                     tint = MaterialTheme.colorScheme.onSurface,
                     contentDescription = "View more",
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(.66f),
                 )
             }
         }
         if (showTitle) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(0.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier =
-                    Modifier
-                        .width(width)
-                        .padding(bottom = spaceBelow),
-            ) {
+            SlidingCardText(focused) {
                 Text(
                     text = stringResource(R.string.view_more),
                     maxLines = 1,

@@ -3,11 +3,9 @@ package com.github.damontecres.wholphin.util
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import com.github.damontecres.wholphin.data.model.ItemPlayback
 import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.ui.playback.CurrentPlayback
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.playStateApi
@@ -22,6 +20,7 @@ import timber.log.Timber
 import java.util.Timer
 import java.util.TimerTask
 import java.util.UUID
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -34,7 +33,7 @@ class TrackActivityPlaybackListener(
     private val player: Player,
     private val getState: () -> PlaybackItemState?,
 ) : Player.Listener {
-    private val coroutineScope = CoroutineScope(Dispatchers.Main)
+    private val coroutineScope = CoroutineScope(WholphinDispatchers.Main)
     private val task: TimerTask =
         object : TimerTask() {
             override fun run() {
@@ -57,7 +56,7 @@ class TrackActivityPlaybackListener(
                     PlaybackStartInfo(
                         canSeek = true,
                         itemId = state.itemId,
-                        isPaused = withContext(Dispatchers.Main) { !player.isPlaying },
+                        isPaused = withContext(WholphinDispatchers.Main) { !player.isPlaying },
                         playMethod = state.playMethod,
                         repeatMode = RepeatMode.REPEAT_NONE,
                         playbackOrder = PlaybackOrder.DEFAULT,
@@ -85,10 +84,13 @@ class TrackActivityPlaybackListener(
         launch("reportPlaybackStopped") {
             getState.invoke()?.let { state ->
                 Timber.v("reportPlaybackStopped for ${state.itemId} at $position")
+                if (position < Duration.ZERO) {
+                    Timber.w("Negative position when reporting playback stopped: %s", position)
+                }
                 api.playStateApi.reportPlaybackStopped(
                     PlaybackStopInfo(
                         itemId = state.itemId,
-                        positionTicks = position.inWholeTicks,
+                        positionTicks = position.inWholeTicks.takeIf { it >= 0 },
                         failed = false,
                         playSessionId = state.playSessionId,
                         liveStreamId = state.liveStreamId,
@@ -117,11 +119,11 @@ class TrackActivityPlaybackListener(
         launch("saveActivity") {
             getState.invoke()?.let { state ->
                 val calcPosition =
-                    withContext(Dispatchers.Main) {
+                    withContext(WholphinDispatchers.Main) {
                         (if (position >= 0) position else player.currentPosition)
                     }
                 if (calcPosition > 0) {
-                    val isPaused = withContext(Dispatchers.Main) { !player.isPlaying }
+                    val isPaused = withContext(WholphinDispatchers.Main) { !player.isPlaying }
                     Timber.v("saveActivity: itemId=${state.itemId}, pos=$calcPosition")
                     api.playStateApi.reportPlaybackProgress(
                         PlaybackProgressInfo(
@@ -174,12 +176,11 @@ data class PlaybackItemState(
 ) {
     constructor(
         playback: CurrentPlayback,
-        itemPlayback: ItemPlayback,
     ) : this(
-        itemId = itemPlayback.itemId,
+        itemId = playback.item.id,
         playMethod = playback.playMethod,
-        audioStreamIndex = itemPlayback.audioIndex.takeIf { itemPlayback.audioIndexEnabled },
-        subtitleStreamIndex = itemPlayback.subtitleIndex.takeIf { itemPlayback.subtitleIndexEnabled },
+        audioStreamIndex = playback.audioIndex.takeIf { it >= 0 },
+        subtitleStreamIndex = playback.subtitleIndex.takeIf { it >= 0 },
         playSessionId = playback.playSessionId,
         liveStreamId = playback.liveStreamId,
     )

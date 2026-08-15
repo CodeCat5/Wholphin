@@ -24,19 +24,21 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
 import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.session.MediaSession
+import com.github.damontecres.wholphin.mpv.MpvPlayer
+import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.AssPlaybackMode
 import com.github.damontecres.wholphin.preferences.MediaExtensionStatus
-import com.github.damontecres.wholphin.preferences.PlaybackPreferences
 import com.github.damontecres.wholphin.preferences.PlayerBackend
+import com.github.damontecres.wholphin.preferences.get
 import com.github.damontecres.wholphin.services.hilt.AuthOkHttpClient
-import com.github.damontecres.wholphin.util.mpv.MpvPlayer
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.peerless2012.ass.media.AssHandler
 import io.github.peerless2012.ass.media.factory.AssRenderersFactory
 import io.github.peerless2012.ass.media.kt.withAssMkvSupport
 import io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory
 import io.github.peerless2012.ass.media.type.AssRenderType
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import timber.log.Timber
@@ -60,9 +62,10 @@ class PlayerFactory
 
         suspend fun createVideoPlayer(
             backend: PlayerBackend,
-            prefs: PlaybackPreferences,
+            appPreferences: AppPreferences,
         ): PlayerCreation {
-            withContext(Dispatchers.Main) {
+            val prefs = appPreferences.playbackPreferences
+            withContext(WholphinDispatchers.Main) {
                 if (currentPlayer?.isReleased == false) {
                     Timber.w("Player was not released before trying to create a new one!")
                     currentPlayer?.release()
@@ -104,6 +107,7 @@ class PlayerFactory
                             WholphinRenderersFactory(context, decodeAv1)
                                 .setEnableDecoderFallback(true)
                                 .setExtensionRendererMode(rendererMode)
+
                         val mediaSourceFactory =
                             if (useLibAss) {
                                 val renderType =
@@ -128,7 +132,15 @@ class PlayerFactory
                                     extractorsFactory,
                                 )
                             }
-                        val trackSelector = createTrackSelector()
+                        val disableAudioOffload =
+                            appPreferences.experimentalPreferences.get { disableAudioOffload } ?: false
+                        val tunneling =
+                            appPreferences.experimentalPreferences.get { videoTunnelingEnabled }
+                        val trackSelector =
+                            createTrackSelector(
+                                tunneling = tunneling,
+                                disableAudioOffload = disableAudioOffload,
+                            )
 
                         ExoPlayer
                             .Builder(context)
@@ -138,7 +150,7 @@ class PlayerFactory
                             .build()
                             .apply {
                                 assHandler?.init(this)
-                                withContext(Dispatchers.Main) {
+                                withContext(WholphinDispatchers.Main) {
                                     setAudioAttributes(
                                         AudioAttributes
                                             .Builder()
@@ -158,7 +170,10 @@ class PlayerFactory
             return PlayerCreation(newPlayer, assHandler)
         }
 
-        fun createAudioPlayer(extensions: MediaExtensionStatus = MediaExtensionStatus.MES_FALLBACK): ExoPlayer {
+        fun createAudioPlayer(
+            disableAudioOffload: Boolean,
+            extensions: MediaExtensionStatus = MediaExtensionStatus.MES_FALLBACK,
+        ): ExoPlayer {
             val rendererMode =
                 when (extensions) {
                     MediaExtensionStatus.MES_FALLBACK -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
@@ -176,7 +191,7 @@ class PlayerFactory
                     OkHttpDataSource.Factory(authOkHttpClient),
                     extractorsFactory,
                 )
-            val trackSelector = createTrackSelector()
+            val trackSelector = createTrackSelector(disableAudioOffload = disableAudioOffload)
             return ExoPlayer
                 .Builder(context)
                 .setMediaSourceFactory(mediaSourceFactory)
@@ -199,18 +214,33 @@ class PlayerFactory
                 .setConstantBitrateSeekingEnabled(true)
                 .setConstantBitrateSeekingAlwaysEnabled(true)
 
-        private fun createTrackSelector() =
-            DefaultTrackSelector(context).apply {
-                setParameters(
-                    buildUponParameters()
-                        .setAudioOffloadPreferences(
-                            AudioOffloadPreferences
-                                .Builder()
-                                .setAudioOffloadMode(AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
-                                .build(),
-                        ),
-                )
-            }
+        private fun createTrackSelector(
+            tunneling: Boolean? = null,
+            disableAudioOffload: Boolean = false,
+        ) = DefaultTrackSelector(context).apply {
+            val offloadMode =
+                if (disableAudioOffload) {
+                    AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
+                } else {
+                    AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+                }
+            setParameters(
+                buildUponParameters()
+                    .apply {
+                        tunneling?.let { setTunnelingEnabled(tunneling) }
+                    }.setAudioOffloadPreferences(
+                        AudioOffloadPreferences
+                            .Builder()
+                            .setAudioOffloadMode(offloadMode)
+                            .build(),
+                    ),
+            )
+        }
+
+        fun createMediaSession(player: Player) =
+            MediaSession
+                .Builder(context, player)
+                .build()
     }
 
 val Player.isReleased: Boolean

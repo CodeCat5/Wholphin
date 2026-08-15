@@ -49,13 +49,13 @@ import com.github.damontecres.wholphin.util.GetItemsRequestHandler
 import com.github.damontecres.wholphin.util.HomeRowLoadingState
 import com.github.damontecres.wholphin.util.LoadingState
 import com.github.damontecres.wholphin.util.RequestHandler
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -63,7 +63,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
-import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import timber.log.Timber
 import java.util.UUID
@@ -123,10 +122,12 @@ class RecommendedViewModel
                         viewModelScope.launchIO {
                             val result =
                                 try {
+                                    val items = execute(row, limit, oneEpisodePerSeries)
                                     HomeRowLoadingState.Success(
                                         title,
-                                        execute(row, limit, oneEpisodePerSeries),
+                                        items,
                                         viewOptions,
+                                        showViewMore = items.size >= limit,
                                     )
                                 } catch (ex: Exception) {
                                     Timber.e(ex, "Exception fetching %s", title)
@@ -176,7 +177,11 @@ class RecommendedViewModel
             }
 
         private fun fetchSuggestions() {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(WholphinDispatchers.IO) {
+                val limit =
+                    userPreferencesService
+                        .getCurrent()
+                        .appPreferences.homePagePreferences.maxItemsPerRow
                 val title = ResStringProvider(R.string.suggestions)
                 try {
                     suggestionService
@@ -193,6 +198,7 @@ class RecommendedViewModel
                                             title,
                                             resource.items,
                                             viewOptions,
+                                            showViewMore = resource.items.size >= limit,
                                         )
                                     }
 
@@ -201,6 +207,7 @@ class RecommendedViewModel
                                             title,
                                             emptyList(),
                                             viewOptions,
+                                            showViewMore = false,
                                         )
                                     }
                                 }
@@ -386,7 +393,7 @@ fun RecommendedContent(
                             viewModel.setFavorite(position, itemId, favorite)
                         },
                         onClickAddPlaylist = { itemId ->
-                            playlistViewModel.loadPlaylists(MediaType.VIDEO)
+                            playlistViewModel.loadPlaylists()
                             showPlaylistDialog.makePresent(itemId)
                         },
                         onSendMediaInfo = viewModel.mediaReportService::sendReportFor,
@@ -483,12 +490,8 @@ fun RecommendedContent(
                 playlistViewModel.createPlaylistAndAddItem(it, itemId)
                 showPlaylistDialog.makeAbsent()
             },
+            onSearch = playlistViewModel::loadPlaylists,
             elevation = 3.dp,
         )
     }
 }
-
-data class RowColumnItem(
-    val position: RowColumn,
-    val item: BaseItem,
-)

@@ -38,6 +38,7 @@ object AppColors {
         val Purple = Color(147, 51, 234)
         val Green = Color(74, 222, 128)
         val Yellow = Color(234, 179, 8)
+        val Red = Color(204, 38, 38)
     }
 }
 
@@ -82,6 +83,8 @@ val PhotoItemFields =
             ItemFields.WIDTH,
             ItemFields.HEIGHT,
         )
+
+val ProgramItemFields = DefaultItemFields + listOf(ItemFields.CHANNEL_INFO)
 
 object Cards {
     const val HEIGHT_2X3_DP = 172

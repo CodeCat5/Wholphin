@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -363,7 +364,7 @@ fun PersonPageContent(
         }
         item {
             LoadingRow(
-                title = rowTitle(stringResource(R.string.movies), movies),
+                title = rowTitle(stringResource(R.string.movies_title), movies),
                 state = movies,
                 rowIndex = MOVIE_ROW,
                 position = position,
@@ -376,7 +377,7 @@ fun PersonPageContent(
         }
         item {
             LoadingRow(
-                title = rowTitle(stringResource(R.string.tv_shows), series),
+                title = rowTitle(stringResource(R.string.tv_shows_title), series),
                 state = series,
                 rowIndex = SERIES_ROW,
                 position = position,
@@ -503,8 +504,9 @@ fun PersonHeader(
                 val text =
                     if (age != null) {
                         stringResource(R.string.born) + ": ${formatDate(it)} (${
-                            stringResource(
-                                R.string.years_old,
+                            pluralStringResource(
+                                R.plurals.years_old,
+                                age,
                                 age,
                             )
                         })"
@@ -533,8 +535,9 @@ fun PersonHeader(
                 val text =
                     if (age != null) {
                         stringResource(R.string.died) + ": ${formatDate(it)} (${
-                            stringResource(
-                                R.string.years_old,
+                            pluralStringResource(
+                                R.plurals.years_old,
+                                age,
                                 age,
                             )
                         })"

@@ -44,6 +44,7 @@ import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
+import com.github.damontecres.wholphin.services.FilterOptionCache
 import com.github.damontecres.wholphin.services.MediaManagementService
 import com.github.damontecres.wholphin.services.MediaReportService
 import com.github.damontecres.wholphin.services.MusicService
@@ -53,11 +54,7 @@ import com.github.damontecres.wholphin.services.ThemeSongPlayer
 import com.github.damontecres.wholphin.services.UserPreferencesService
 import com.github.damontecres.wholphin.services.deleteItem
 import com.github.damontecres.wholphin.ui.SlimItemFields
-import com.github.damontecres.wholphin.ui.data.AddPlaylistViewModel
-import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
-import com.github.damontecres.wholphin.ui.data.ItemDetailsDialogInfo
 import com.github.damontecres.wholphin.ui.data.SortAndDirection
-import com.github.damontecres.wholphin.ui.detail.PlaylistDialog
 import com.github.damontecres.wholphin.ui.detail.music.addToQueue
 import com.github.damontecres.wholphin.ui.equalsNotNull
 import com.github.damontecres.wholphin.ui.launchDefault
@@ -67,20 +64,21 @@ import com.github.damontecres.wholphin.ui.rememberInt
 import com.github.damontecres.wholphin.ui.showToast
 import com.github.damontecres.wholphin.ui.toServerString
 import com.github.damontecres.wholphin.ui.tryRequestFocus
-import com.github.damontecres.wholphin.ui.util.FilterUtils
 import com.github.damontecres.wholphin.util.ApiRequestPager
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.ExceptionHandler
+import com.github.damontecres.wholphin.util.GetArtistsHandler
 import com.github.damontecres.wholphin.util.GetItemsRequestHandler
 import com.github.damontecres.wholphin.util.GetPersonsHandler
 import com.github.damontecres.wholphin.util.LoadingState
+import com.github.damontecres.wholphin.util.RequestHandler
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.github.damontecres.wholphin.util.successValue
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -95,8 +93,8 @@ import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemSortBy
-import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.SortOrder
+import org.jellyfin.sdk.model.api.request.GetArtistsRequest
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import org.jellyfin.sdk.model.api.request.GetPersonsRequest
 import org.jellyfin.sdk.model.serializer.toUUID
@@ -122,13 +120,15 @@ class CollectionFolderViewModel
         private val musicService: MusicService,
         val streamChoiceService: StreamChoiceService,
         val mediaReportService: MediaReportService,
+        private val filterOptionCache: FilterOptionCache,
         @Assisted val itemId: String,
         @Assisted initialSortAndDirection: SortAndDirection?,
         @Assisted("recursive") private val recursive: Boolean,
         @Assisted private val collectionFilter: CollectionFolderFilter,
         @Assisted("useSeriesForPrimary") private val useSeriesForPrimary: Boolean,
         @Assisted defaultViewOptions: ViewOptions,
-    ) : ViewModel() {
+    ) : ViewModel(),
+        ContextMenuProvider {
         @AssistedFactory
         interface Factory {
             fun create(
@@ -163,7 +163,8 @@ class CollectionFolderViewModel
 
                     val libraryDisplayInfo =
                         serverRepository.currentUser?.let { user ->
-                            libraryDisplayInfoDao.getItem(user, itemId)
+                            val id = collectionFilter.libraryDisplayInfoIdOverride ?: itemId
+                            libraryDisplayInfoDao.getItem(user, id)
                         }
                     _state.update {
                         it.copy(
@@ -240,7 +241,7 @@ class CollectionFolderViewModel
                         val libraryDisplayInfo =
                             LibraryDisplayInfo(
                                 userId = user.rowId,
-                                itemId = itemId,
+                                itemId = collectionFilter.libraryDisplayInfoIdOverride ?: itemId,
                                 sort = newSort.sort,
                                 direction = newSort.direction,
                                 filter = newFilter,
@@ -253,8 +254,9 @@ class CollectionFolderViewModel
         }
 
         fun saveViewOptions(viewOptions: ViewOptions) {
+            position = 0
             _state.update { it.copy(viewOptions = viewOptions) }
-            viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+            viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
                 saveLibraryDisplayInfo(viewOptions = viewOptions)
                 if (!viewOptions.showBackdrop) {
                     backdropService.clearBackdrop()
@@ -298,7 +300,7 @@ class CollectionFolderViewModel
             recursive: Boolean,
             filter: GetItemsFilter,
             useSeriesForPrimary: Boolean,
-        ) = viewModelScope.launch(Dispatchers.IO) {
+        ) = viewModelScope.launch(WholphinDispatchers.IO) {
             _state.update {
                 it.copy(
                     items = DataLoadingState.Loading,
@@ -375,7 +377,32 @@ class CollectionFolderViewModel
                         )
                     newPager
                 }
+
+                GetItemsFilterOverride.ARTIST -> {
+                    ApiRequestPager(
+                        api,
+                        createGetArtistsRequest(filter),
+                        GetArtistsHandler,
+                        viewModelScope,
+                        useSeriesForPrimary = useSeriesForPrimary,
+                    )
+                }
             }
+
+        /**
+         * Shared with [positionOfLetter] so that the alphabet jump counts the same artists that are
+         * actually paged through
+         */
+        private fun createGetArtistsRequest(filter: GetItemsFilter): GetArtistsRequest {
+            val item = state.value.item.successValue
+            return filter.applyTo(
+                GetArtistsRequest(
+                    parentId = item?.id,
+                    enableImageTypes = listOf(ImageType.PRIMARY, ImageType.THUMB),
+                    fields = SlimItemFields,
+                ),
+            )
+        }
 
         private fun createGetItemsRequest(
             sortAndDirection: SortAndDirection,
@@ -434,52 +461,86 @@ class CollectionFolderViewModel
         }
 
         suspend fun getFilterOptionValues(filterOption: ItemFilterBy<*>): List<FilterValueOption> =
-            FilterUtils.getFilterOptionValues(
-                api,
-                serverRepository.currentUser?.id,
+            filterOptionCache.getFilterOptionValues(
                 itemId.toUUID(),
                 filterOption,
             )
 
+        /**
+         * The count must come from the same endpoint that [createPager] pages through, otherwise
+         * the index refers to a different result set and lands past the end of the list.
+         */
         suspend fun positionOfLetter(letter: Char): Int? =
-            withContext(Dispatchers.IO) {
-                val sort = state.value.sortAndDirection
+            withContext(WholphinDispatchers.IO) {
                 val filter = state.value.filter
-                val request =
-                    createGetItemsRequest(
-                        sortAndDirection = sort,
-                        recursive = recursive,
-                        filter = filter,
-                    ).copy(
-                        enableImageTypes = null,
-                        fields = null,
-                        nameLessThan = letter.toString(),
-                        limit = 0,
-                        enableTotalRecordCount = true,
-                    )
-                val result by GetItemsRequestHandler.execute(api, request)
-                result.totalRecordCount
+                when (filter.override) {
+                    GetItemsFilterOverride.ARTIST -> {
+                        GetArtistsHandler.countMatching(
+                            createGetArtistsRequest(filter).copy(
+                                enableImageTypes = null,
+                                fields = null,
+                                nameLessThan = letter.toString(),
+                                limit = 0,
+                                enableTotalRecordCount = true,
+                            ),
+                        )
+                    }
+
+                    // GetPersonsRequest has no nameLessThan or startIndex, so /Persons cannot be
+                    // counted up to a letter at all
+                    GetItemsFilterOverride.PERSON -> {
+                        null
+                    }
+
+                    GetItemsFilterOverride.NONE -> {
+                        GetItemsRequestHandler.countMatching(
+                            createGetItemsRequest(
+                                sortAndDirection = state.value.sortAndDirection,
+                                recursive = recursive,
+                                filter = filter,
+                            ).copy(
+                                enableImageTypes = null,
+                                fields = null,
+                                nameLessThan = letter.toString(),
+                                limit = 0,
+                                enableTotalRecordCount = true,
+                            ),
+                        )
+                    }
+                }
             }
 
-        fun setWatched(
+        /**
+         * [request] must ask for the count, ie `limit = 0` and `enableTotalRecordCount = true`
+         */
+        private suspend fun <T> RequestHandler<T>.countMatching(request: T): Int {
+            val result by execute(api, request)
+            return result.totalRecordCount
+        }
+
+        override fun setWatched(
             position: Int,
             itemId: UUID,
             played: Boolean,
-        ) = viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
-            favoriteWatchManager.setWatched(itemId, played)
-            (state.value.items as? DataLoadingState.Success)?.let {
-                (it.data as? ApiRequestPager<*>)?.refreshItem(position, itemId)
+        ) {
+            viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
+                favoriteWatchManager.setWatched(itemId, played)
+                (state.value.items as? DataLoadingState.Success)?.let {
+                    (it.data as? ApiRequestPager<*>)?.refreshItem(position, itemId)
+                }
             }
         }
 
-        fun setFavorite(
+        override fun setFavorite(
             position: Int,
             itemId: UUID,
             favorite: Boolean,
-        ) = viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
-            favoriteWatchManager.setFavorite(itemId, favorite)
-            (state.value.items as? DataLoadingState.Success)?.let {
-                (it.data as? ApiRequestPager<*>)?.refreshItem(position, itemId)
+        ) {
+            viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
+                favoriteWatchManager.setFavorite(itemId, favorite)
+                (state.value.items as? DataLoadingState.Success)?.let {
+                    (it.data as? ApiRequestPager<*>)?.refreshItem(position, itemId)
+                }
             }
         }
 
@@ -489,7 +550,7 @@ class CollectionFolderViewModel
             }
         }
 
-        fun navigateTo(destination: Destination) {
+        override fun navigateTo(destination: Destination) {
             release()
             navigationManager.navigateTo(destination)
         }
@@ -509,7 +570,7 @@ class CollectionFolderViewModel
             }
         }
 
-        fun deleteItem(
+        override fun deleteItem(
             index: Int,
             item: BaseItem,
         ) {
@@ -520,7 +581,7 @@ class CollectionFolderViewModel
             }
         }
 
-        fun canDelete(
+        override fun canDelete(
             item: BaseItem,
             appPreferences: AppPreferences,
         ): Boolean = mediaManagementService.canDelete(item, appPreferences)
@@ -529,6 +590,10 @@ class CollectionFolderViewModel
             item: BaseItem,
             index: Int,
         ) = addToQueue(api, musicService, item, index)
+
+        override fun sendReportFor(itemId: UUID) = mediaReportService.sendReportFor(itemId)
+
+        override fun isAdministrator(): Boolean = serverRepository.currentUserDto?.policy?.isAdministrator == true
     }
 
 data class CollectionFolderState(
@@ -637,7 +702,6 @@ fun CollectionFolderView(
     useSeriesForPrimary: Boolean = true,
     filterOptions: List<ItemFilterBy<*>> = DefaultFilterOptions,
     focusRequesterOnEmpty: FocusRequester? = null,
-    playlistViewModel: AddPlaylistViewModel = hiltViewModel(),
     viewModel: CollectionFolderViewModel =
         hiltViewModel<CollectionFolderViewModel, CollectionFolderViewModel.Factory>(
             key = viewModelKey,
@@ -655,40 +719,11 @@ fun CollectionFolderView(
     val state by viewModel.state.collectAsState()
     var position by rememberInt(viewModel.position)
 
-    var showContextMenu by remember { mutableStateOf<ContextMenu?>(null) }
-    var overviewDialog by remember { mutableStateOf<ItemDetailsDialogInfo?>(null) }
-    var showPlaylistDialog by remember { mutableStateOf<Optional<UUID>>(Optional.absent()) }
-    val playlistState by playlistViewModel.playlistState.collectAsState()
+    val contextMenu = rememberContextMenu(preferences, viewModel)
     var showViewOptions by rememberSaveable { mutableStateOf(false) }
-
-    val contextActions =
-        remember {
-            ContextMenuActions(
-                navigateTo = viewModel::navigateTo,
-                onClickWatch = { itemId, watched ->
-                    viewModel.setWatched(viewModel.position, itemId, watched)
-                },
-                onClickFavorite = { itemId, favorite ->
-                    viewModel.setFavorite(viewModel.position, itemId, favorite)
-                },
-                onClickAddPlaylist = { itemId ->
-                    playlistViewModel.loadPlaylists(MediaType.VIDEO)
-                    showPlaylistDialog.makePresent(itemId)
-                },
-                onSendMediaInfo = viewModel.mediaReportService::sendReportFor,
-                onDeleteItem = { viewModel.deleteItem(viewModel.position, it) },
-                onShowOverview = { overviewDialog = ItemDetailsDialogInfo(it) },
-                onChooseVersion = { _, _ ->
-                    // Not supported on this page
-                },
-                onChooseTracks = { result ->
-                    // Not supported on this page
-                },
-                onClearChosenStreams = {
-                    // Not supported on this page
-                },
-            )
-        }
+    var filterDropdownShowing by remember { mutableStateOf(false) }
+    val headerRowFocusRequester = remember { FocusRequester() }
+    val filterButtonFocusRequester = remember { FocusRequester() }
 
     val gridActions =
         remember(actions) {
@@ -702,18 +737,7 @@ fun CollectionFolderView(
                     if (actions.onLongClickItem != null) {
                         actions.onLongClickItem.invoke(index, item)
                     } else {
-                        showContextMenu =
-                            ContextMenu.ForBaseItem(
-                                fromLongClick = true,
-                                item = item,
-                                chosenStreams = null,
-                                showGoTo = true,
-                                showStreamChoices = false,
-                                canDelete = viewModel.canDelete(item, preferences.appPreferences),
-                                canRemoveContinueWatching = false,
-                                canRemoveNextUp = false,
-                                actions = contextActions,
-                            )
+                        contextMenu.showContextMenu(index, item)
                     }
                 },
                 onClickPlayAll =
@@ -782,7 +806,6 @@ fun CollectionFolderView(
                         ?: item?.data?.collectionType?.name
                         ?: stringResource(R.string.collection)
                 Column(modifier = Modifier.fillMaxSize()) {
-                    val headerRowFocusRequester = remember { FocusRequester() }
                     LifecycleResumeEffect(itemId) {
                         viewModel.onResumePage()
 
@@ -821,6 +844,8 @@ fun CollectionFolderView(
                         onClickPlayAll = gridActions.onClickPlayAll!!,
                         onClickShowViewOptions = { showViewOptions = true },
                         modifier = Modifier.focusRequester(headerRowFocusRequester),
+                        onShowFilterDropdown = { filterDropdownShowing = it },
+                        filterButtonFocusRequester = filterButtonFocusRequester,
                     )
 
                     when (val pager = state.items) {
@@ -839,9 +864,14 @@ fun CollectionFolderView(
 
                         is DataLoadingState.Success<List<BaseItem?>> -> {
                             LaunchedEffect(Unit) {
-                                if (pager.data.isNotEmpty()) {
-                                    gridFocusRequester.tryRequestFocus()
-                                }
+                                val focusRequester =
+                                    when {
+                                        contextMenu.isShowing -> null
+                                        filterDropdownShowing -> filterButtonFocusRequester
+                                        pager.data.isNotEmpty() -> gridFocusRequester
+                                        else -> focusRequesterOnEmpty ?: headerRowFocusRequester
+                                    }
+                                focusRequester?.tryRequestFocus()
                             }
                             Box(Modifier.fillMaxSize()) {
                                 if (state.viewOptions.type == ViewOptionsType.GRID) {
@@ -912,41 +942,7 @@ fun CollectionFolderView(
             }
         }
     }
-    overviewDialog?.let { info ->
-        ItemDetailsDialog(
-            info = info,
-            showFilePath =
-                viewModel.serverRepository.currentUserDto
-                    ?.policy
-                    ?.isAdministrator == true,
-            onDismissRequest = { overviewDialog = null },
-        )
-    }
-    showContextMenu?.let { contextMenu ->
-        ContextMenuDialog(
-            onDismissRequest = { showContextMenu = null },
-            getMediaSource = null,
-            contextMenu = contextMenu,
-            preferredSubtitleLanguage = null,
-        )
-    }
-    showPlaylistDialog.compose { itemId ->
-        PlaylistDialog(
-            title = stringResource(R.string.add_to_playlist),
-            state = playlistState,
-            onDismissRequest = { showPlaylistDialog.makeAbsent() },
-            onClick = {
-                playlistViewModel.addToPlaylist(it.id, itemId)
-                showPlaylistDialog.makeAbsent()
-            },
-            createEnabled = true,
-            onCreatePlaylist = {
-                playlistViewModel.createPlaylistAndAddItem(it, itemId)
-                showPlaylistDialog.makeAbsent()
-            },
-            elevation = 3.dp,
-        )
-    }
+    contextMenu.Compose()
     AnimatedVisibility(showViewOptions) {
         ViewOptionsDialog(
             viewOptions = state.viewOptions,

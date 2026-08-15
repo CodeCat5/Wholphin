@@ -20,6 +20,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.alphabetSortName
 import com.github.damontecres.wholphin.data.model.createGenreDestination
 import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.services.NavigationManager
@@ -33,13 +34,13 @@ import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.GetGenresRequestHandler
 import com.github.damontecres.wholphin.util.GetItemsRequestHandler
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.mayakapps.kache.InMemoryKache
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +52,7 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
@@ -103,7 +105,12 @@ class GenreViewModel
                             .execute(api, request)
                             .content.items
                             .map {
-                                Genre(it.id, it.name ?: "", null)
+                                Genre(
+                                    id = it.id,
+                                    name = it.name ?: "",
+                                    imageUrl = null,
+                                    sortName = it.alphabetSortName,
+                                )
                             }
                     _state.update {
                         it.copy(
@@ -141,7 +148,7 @@ class GenreViewModel
         }
 
         suspend fun positionOfLetter(letter: Char): Int =
-            withContext(Dispatchers.IO) {
+            withContext(WholphinDispatchers.IO) {
                 val request =
                     GetGenresRequest(
                         parentId = itemId,
@@ -196,7 +203,7 @@ suspend fun getGenreImageMap(
     val semaphore = Semaphore(4)
     genres
         .map { genreId ->
-            scope.async(Dispatchers.IO) {
+            scope.async(WholphinDispatchers.IO) {
                 semaphore.withPermit {
                     val item =
                         GetItemsRequestHandler
@@ -242,10 +249,10 @@ data class Genre(
     val id: UUID,
     val name: String,
     val imageUrl: String?,
+    override val sortName: String = name,
 ) : CardGridItem {
     override val gridId: String get() = id.toString()
     override val playable: Boolean = false
-    override val sortName: String get() = name
 }
 
 /**
@@ -255,6 +262,7 @@ data class Genre(
 fun GenreCardGrid(
     itemId: UUID,
     includeItemTypes: List<BaseItemKind>?,
+    collectionType: CollectionType,
     modifier: Modifier = Modifier,
     initialPosition: Int = 0,
     viewModel: GenreViewModel =
@@ -267,7 +275,7 @@ fun GenreCardGrid(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val cardWidthPx =
-        remember {
+        remember(density) {
             with(density) {
                 // Grid has 16dp padding on either side & 16dp spacing between 4 cards
                 // This isn't exact though because it doesn't account for nav drawer or letters, but it's close and the calculation is much faster
@@ -308,6 +316,7 @@ fun GenreCardGrid(
                                 parentId = itemId,
                                 parentName = item.title,
                                 includeItemTypes = includeItemTypes,
+                                collectionType = collectionType,
                             ),
                         )
                     },

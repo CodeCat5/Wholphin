@@ -6,27 +6,27 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.JellyfinUser
 import com.github.damontecres.wholphin.data.model.NavPinType
 import com.github.damontecres.wholphin.services.hilt.DefaultCoroutineScope
+import com.github.damontecres.wholphin.ui.collectLatestIn
 import com.github.damontecres.wholphin.ui.launchDefault
 import com.github.damontecres.wholphin.ui.main.settings.Library
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.nav.NavDrawerItem
 import com.github.damontecres.wholphin.ui.nav.ServerNavDrawerItem
 import com.github.damontecres.wholphin.ui.showToast
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.github.damontecres.wholphin.util.supportedCollectionTypes
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.exception.InvalidStatusException
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.model.api.CollectionType
@@ -52,35 +52,37 @@ class NavDrawerService
         private val seerrServerRepository: SeerrServerRepository,
         private val musicService: MusicService,
     ) {
-        private val _state = MutableStateFlow(NavDrawerItemState.EMPTY)
+        private val _state = MutableStateFlow(NavDrawerItemState())
         val state: StateFlow<NavDrawerItemState> = _state
 
         init {
             // Handle updating the nav drawer when the user changes
-            serverRepository.currentUserFlow
-                .combine(serverRepository.currentUserDtoFlow) { user, userDto ->
-                    Pair(user, userDto)
-                }.onEach { (user, userDto) ->
-                    Timber.d("User updated: user=%s, userDto=%s", user?.id, userDto?.id)
-                    _state.update {
-                        it.copy(
-                            items = emptyList(),
-                            moreItems = emptyList(),
-                        )
-                    }
+            combine(
+                serverRepository.currentUserFlow,
+                serverRepository.currentUserDtoFlow,
+                seerrServerRepository.active,
+            ) { user, userDto, discoverActive ->
+                Triple(user, userDto, discoverActive)
+            }.collectLatestIn(coroutineScope) { (user, userDto, discoverActive) ->
+                Timber.d(
+                    "User updated: user=%s, userDto=%s, discoverActive=%s",
+                    user?.id,
+                    userDto?.id,
+                    discoverActive,
+                )
+                try {
                     if (user != null && userDto != null && user.id == userDto.id) {
-                        updateNavDrawer(user, userDto)
+                        updateNavDrawer(user, userDto, discoverActive)
+                    } else {
+                        _state.update { NavDrawerItemState() }
                     }
-                }.catch { ex ->
+                } catch (ex: CancellationException) {
+                    throw ex
+                } catch (ex: Exception) {
                     Timber.e(ex, "Error updating nav drawer")
                     showToast(context, "Error fetching user's views")
-                }.launchIn(coroutineScope)
-
-            // Handle when the user has logged into a Seerr server
-            seerrServerRepository.active
-                .onEach { discoverActive ->
-                    _state.update { it.copy(discoverEnabled = discoverActive) }
-                }.launchIn(coroutineScope)
+                }
+            }
 
             // Handle when music is actively playing or not
             coroutineScope.launchDefault {
@@ -132,13 +134,22 @@ class NavDrawerService
                     .content.items
             val recordingFolders =
                 if (tvAccess) {
-                    api.liveTvApi
-                        .getRecordingFolders(userId = userId)
-                        .content.items
-                        .map { it.id }
-                        .toSet()
+                    try {
+                        api.liveTvApi
+                            .getRecordingFolders(userId = userId)
+                            .content.items
+                            .map { it.id }
+                            .toSet()
+                    } catch (ex: InvalidStatusException) {
+                        if (ex.status == 401 || ex.status == 403) {
+                            Timber.w("Got HTTP %s querying for recording folders", ex.status)
+                            emptySet()
+                        } else {
+                            throw ex
+                        }
+                    }
                 } else {
-                    setOf()
+                    emptySet()
                 }
             val libraries =
                 userViews
@@ -178,8 +189,13 @@ class NavDrawerService
         suspend fun updateNavDrawer(
             user: JellyfinUser,
             userDto: UserDto,
+            discoverActive: Boolean,
         ) {
-            val builtins = listOf(NavDrawerItem.Favorites, NavDrawerItem.Discover)
+            val builtins =
+                buildList {
+                    add(NavDrawerItem.Favorites)
+                    if (discoverActive) add(NavDrawerItem.Discover)
+                }
             val allLibraries = getAllUserLibraries(user.id, userDto.tvAccess)
             val libraries =
                 allLibraries
@@ -204,7 +220,7 @@ class NavDrawerService
             val allItems = builtins + libraries
 
             val navDrawerPins =
-                withContext(Dispatchers.IO) {
+                withContext(WholphinDispatchers.IO) {
                     serverPreferencesDao.getNavDrawerPinnedItems(user).associateBy { it.itemId }
                 }
 
@@ -235,15 +251,10 @@ class NavDrawerService
     }
 
 data class NavDrawerItemState(
-    val items: List<NavDrawerItem>,
-    val moreItems: List<NavDrawerItem>,
-    val discoverEnabled: Boolean,
-    val nowPlayingEnabled: Boolean,
-    val nowPlayingTitle: String?,
-) {
-    companion object {
-        val EMPTY = NavDrawerItemState(emptyList(), emptyList(), false, false, null)
-    }
-}
+    val items: List<NavDrawerItem> = emptyList(),
+    val moreItems: List<NavDrawerItem> = emptyList(),
+    val nowPlayingEnabled: Boolean = false,
+    val nowPlayingTitle: String? = null,
+)
 
 val UserDto.tvAccess: Boolean get() = policy?.enableLiveTvAccess == true

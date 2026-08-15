@@ -37,10 +37,12 @@ import com.github.damontecres.wholphin.ui.lt
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.showToast
 import com.github.damontecres.wholphin.util.ApiRequestPager
+import com.github.damontecres.wholphin.util.BlockingList
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.GetEpisodesRequestHandler
 import com.github.damontecres.wholphin.util.GetItemsRequestHandler
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.github.damontecres.wholphin.util.successValue
 import com.google.common.cache.CacheBuilder
 import dagger.assisted.Assisted
@@ -48,9 +50,9 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -137,7 +139,7 @@ class SeriesViewModel
 
                 val episodeListDeferred =
                     if (seriesPageType == SeriesPageType.OVERVIEW) {
-                        viewModelScope.async(Dispatchers.IO) {
+                        viewModelScope.async(WholphinDispatchers.IO) {
                             if (seasonEpisodeIds != null) {
                                 loadEpisodesInternal(
                                     seasonEpisodeIds.seasonId,
@@ -157,18 +159,29 @@ class SeriesViewModel
                     } else {
                         CompletableDeferred(value = EpisodeList.Loading)
                     }
-                val seasons = seasonsDeferred.await()
-                val episodes = episodeListDeferred.await()
+                val (seasons, episodes) =
+                    try {
+                        val seasons = seasonsDeferred.await()
+                        val episodes = episodeListDeferred.await()
+                        seasons to episodes
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Exception fetching seasons/episodes for series %s", seriesId)
+                        _state.update { it.copy(series = DataLoadingState.Error(ex)) }
+                        return@launchIO
+                    }
                 Timber.v("Done")
 
                 if (seriesPageType == SeriesPageType.OVERVIEW && seasonEpisodeIds != null) {
                     viewModelScope.launchIO {
                         val index =
                             (seasons as? ApiRequestPager<*>)?.let {
-                                findIndexOf(
+                                findIndexByNumberOrIdFast(
                                     seasonEpisodeIds.seasonNumber,
                                     seasonEpisodeIds.seasonId,
                                     it,
+                                    null,
                                 )
                             } ?: 0
                         Timber.v("Got initial season index: $index")
@@ -292,7 +305,7 @@ class SeriesViewModel
             series: BaseItem,
             seasonNum: Int?,
         ): Deferred<List<BaseItem?>> =
-            viewModelScope.async(Dispatchers.IO) {
+            viewModelScope.async(WholphinDispatchers.IO) {
                 Timber.v("getSeasons for %s", series.id)
                 val request =
                     GetItemsRequest(
@@ -301,6 +314,7 @@ class SeriesViewModel
                         includeItemTypes = listOf(BaseItemKind.SEASON),
                         sortBy = listOf(ItemSortBy.INDEX_NUMBER),
                         sortOrder = listOf(SortOrder.ASCENDING),
+                        enableUserData = seriesPageType == SeriesPageType.DETAILS,
                         fields =
                             if (seriesPageType == SeriesPageType.DETAILS) {
                                 listOf(
@@ -319,16 +333,8 @@ class SeriesViewModel
                         request,
                         GetItemsRequestHandler,
                         viewModelScope,
-                        pageSize = 10,
+                        pageSize = 20,
                     ).init(seasonNum ?: 0)
-//                val seasons =
-//                    GetItemsRequestHandler.execute(api, request).content.items.map {
-//                        BaseItem.from(
-//                            it,
-//                            api,
-//                        )
-//                    }
-//                Timber.v("Loaded ${seasons.size} seasons for series ${series.id}")
                 pager
             }
 
@@ -350,6 +356,7 @@ class SeriesViewModel
                             ItemFields.CUSTOM_RATING,
                             ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
                             ItemFields.CAN_DELETE,
+                            ItemFields.PARENT_ID,
                         ),
                 )
             Timber.v(
@@ -361,10 +368,10 @@ class SeriesViewModel
             pager.init(episodeNumber ?: 0)
             val initialIndex =
                 if (episodeId != null || episodeNumber != null) {
-                    findIndexOf(episodeNumber, episodeId, pager)
+                    findIndexByNumberOrIdFast(episodeNumber, episodeId, pager, seasonId)
                         .coerceAtLeast(0)
                 } else {
-                    // Force the first page to to be fetched
+                    // Force the first page to be fetched
                     if (pager.isNotEmpty()) {
                         pager.getBlocking(0)
                     }
@@ -405,7 +412,7 @@ class SeriesViewModel
             itemId: UUID,
             played: Boolean,
             listIndex: Int?,
-        ) = viewModelScope.launch(Dispatchers.IO + ExceptionHandler()) {
+        ) = viewModelScope.launch(WholphinDispatchers.IO + ExceptionHandler()) {
             favoriteWatchManager.setWatched(itemId, played)
             listIndex?.let {
                 refreshEpisode(itemId, listIndex)
@@ -440,7 +447,7 @@ class SeriesViewModel
             itemId: UUID,
             favorite: Boolean,
             listIndex: Int?,
-        ) = viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+        ) = viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
             favoriteWatchManager.setFavorite(itemId, favorite)
             if (listIndex != null) {
                 refreshEpisode(itemId, listIndex)
@@ -452,13 +459,13 @@ class SeriesViewModel
         fun setSeasonWatched(
             seasonId: UUID,
             played: Boolean,
-        ) = viewModelScope.launch(Dispatchers.IO + ExceptionHandler()) {
+        ) = viewModelScope.launch(WholphinDispatchers.IO + ExceptionHandler()) {
             setWatched(seasonId, played, null)
             updateSeries()
         }
 
         fun setWatchedSeries(played: Boolean) =
-            viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+            viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
                 favoriteWatchManager.setWatched(seriesId, played)
                 updateSeries()
             }
@@ -466,7 +473,7 @@ class SeriesViewModel
         fun refreshEpisode(
             itemId: UUID,
             listIndex: Int,
-        ) = viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+        ) = viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
             val eps = state.value.episodes
             if (eps is EpisodeList.Success) {
                 eps.episodes.refreshItem(listIndex, itemId)
@@ -481,7 +488,7 @@ class SeriesViewModel
          * Play whichever episode is next up for series or else the first episode
          */
         fun playNextUp() {
-            viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+            viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
                 val result by api.tvShowsApi.getNextUp(seriesId = seriesId)
                 val nextUp =
                     result.items.firstOrNull() ?: api.tvShowsApi
@@ -491,7 +498,7 @@ class SeriesViewModel
                         ).content.items
                         .firstOrNull()
                 if (nextUp != null) {
-                    withContext(Dispatchers.Main) {
+                    withContext(WholphinDispatchers.Main) {
                         navigateTo(Destination.Playback(BaseItem(nextUp)))
                     }
                 } else {
@@ -582,7 +589,7 @@ class SeriesViewModel
                 val result =
                     peopleInEpisodeCache
                         .get(item.id) {
-                            viewModelScope.async(Dispatchers.IO) {
+                            viewModelScope.async(WholphinDispatchers.IO) {
                                 val list =
                                     api.userLibraryApi
                                         .getItem(item.id)
@@ -704,48 +711,119 @@ enum class SeriesPageType {
     OVERVIEW,
 }
 
-private suspend fun findIndexOf(
+private fun checkNumberOrId(
     targetNum: Int?,
     targetId: UUID?,
-    pager: ApiRequestPager<*>,
+    indexNumber: Int?,
+    id: UUID?,
+): Boolean =
+    if (targetId != null) {
+        equalsNotNull(targetId, id)
+    } else {
+        equalsNotNull(indexNumber, targetNum)
+    }
+
+/**
+ * Find the index in the [list] where the item's `indexNumber`==[targetNum] or `id`==[targetId]
+ *
+ * If the list is smaller than its page size, then the entire dataset is cached and
+ * [BlockingList.indexOfBlocking] is used, otherwise this function calls [findIndexByNumberOrId]
+ */
+suspend fun findIndexByNumberOrIdFast(
+    targetNum: Int?,
+    targetId: UUID?,
+    list: ApiRequestPager<*>,
+    parentId: UUID?,
+): Int =
+    if (list.size <= list.pageSize) {
+        Timber.v("Using findIndexByNumberOrIdFast indexOfBlocking method")
+        list.indexOfBlocking {
+            checkNumberOrId(targetNum, targetId, it?.indexNumber, it?.id) &&
+                if (parentId != null) {
+                    it?.data?.parentId == parentId
+                } else {
+                    true
+                }
+        }
+    } else {
+        findIndexByNumberOrId(targetNum, targetId, list as BlockingList<BaseItem?>, parentId)
+    }
+
+/**
+ * Find the index in the [list] where the item's `indexNumber`==[targetNum] or `id`==[targetId]
+ *
+ * This is necessary in cases where items are missing. E.g. if looking for episode 4 but
+ * episodes 2 & 3 is missing, then the index in the list for episode 4 will be `1`.
+ *
+ * @param targetNum the 1-index season or episode number
+ * @param targetId the season or episode ID
+ *
+ * @return the index within [list] that matches, or zero if no match is found
+ */
+suspend fun findIndexByNumberOrId(
+    targetNum: Int?,
+    targetId: UUID?,
+    list: BlockingList<BaseItem?>,
+    parentId: UUID? = null,
 ): Int {
+    Timber.v("Using findIndexByNumberOrId")
+    // Adjust for 1-based numbers
+    val listIndex = targetNum?.minus(1)?.coerceAtLeast(0)
     val index =
-        if (targetId != null && (targetNum == null || targetNum !in pager.indices)) {
+        if (targetId != null && (targetNum == null || listIndex !in list.indices)) {
             // No hint info, so have to check everything
-            pager.indexOfBlocking {
-                equalsNotNull(it?.indexNumber, targetNum) ||
-                    equalsNotNull(it?.id, targetId)
-            }
-        } else if (targetNum != null && targetNum in pager.indices) {
-            // Start searching from the season number and choose direction from there
-            val num = pager.getBlocking(targetNum)?.indexNumber
-            if (num.lt(targetNum)) {
-                for (i in targetNum + 1 until pager.lastIndex) {
-                    val season = pager.getBlocking(i)
-                    if (equalsNotNull(season?.indexNumber, targetNum) ||
-                        equalsNotNull(season?.id, targetId)
-                    ) {
-                        return i
-                    }
-                }
-                return 0
-            } else if (num.gt(targetNum)) {
-                for (i in targetNum - 1 downTo 0) {
-                    val season = pager.getBlocking(i)
-                    if (equalsNotNull(season?.indexNumber, targetNum) ||
-                        equalsNotNull(season?.id, targetId)
-                    ) {
-                        return i
-                    }
-                }
-                return 0
-            } else {
-                targetNum
-            }
+            list
+                .indexOfBlocking {
+                    checkNumberOrId(targetNum, targetId, it?.indexNumber, it?.id)
+                }.coerceAtLeast(0)
+        } else if (listIndex != null && listIndex in list.indices) {
+            searchList(listIndex, targetNum, targetId, list, parentId)
         } else {
             0
         }
     return index
+}
+
+private suspend fun searchList(
+    listIndex: Int,
+    targetNum: Int,
+    targetId: UUID?,
+    list: BlockingList<BaseItem?>,
+    parentId: UUID?,
+): Int {
+    val item = list.getBlocking(listIndex)
+    if (parentId != null && item?.data?.parentId != parentId) {
+        return if (listIndex - 1 in list.indices) {
+            searchList(listIndex - 1, targetNum, targetId, list, parentId)
+        } else if (listIndex + 1 in list.indices) {
+            searchList(listIndex + 1, targetNum, targetId, list, parentId)
+        } else {
+            0
+        }
+    }
+    val num = item?.indexNumber
+    if (num.lt(targetNum)) {
+        for (i in listIndex + 1 until list.size) {
+            val item = list.getBlocking(i)
+            if (checkNumberOrId(targetNum, targetId, item?.indexNumber, item?.id)) {
+                return i
+            }
+        }
+        return 0
+    } else if (num.gt(targetNum)) {
+        for (i in listIndex - 1 downTo 0) {
+            val item = list.getBlocking(i)
+            if (checkNumberOrId(targetNum, targetId, item?.indexNumber, item?.id)) {
+                return i
+            }
+        }
+        return 0
+    } else {
+        return list
+            .indexOfBlocking {
+                checkNumberOrId(targetNum, targetId, it?.indexNumber, it?.id)
+            }.coerceAtLeast(0)
+    }
 }
 
 data class SeriesState(

@@ -28,7 +28,6 @@ import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.LoadingState
-import com.github.damontecres.wholphin.util.RememberTabManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,21 +51,24 @@ class PreferencesViewModel
         val navigationManager: NavigationManager,
         val backdropService: BackdropService,
         val screensaverService: ScreensaverService,
-        private val rememberTabManager: RememberTabManager,
         private val serverRepository: ServerRepository,
         private val seerrServerRepository: SeerrServerRepository,
         private val deviceInfo: DeviceInfo,
         private val clientInfo: ClientInfo,
         private val updateChecker: UpdateChecker,
-    ) : ViewModel(),
-        RememberTabManager by rememberTabManager {
-        val currentUser
-            get() =
-                serverRepository.currentUserFlow.stateIn(
-                    viewModelScope,
-                    SharingStarted.Eagerly,
-                    null,
-                )
+    ) : ViewModel() {
+        val currentUser =
+            serverRepository.currentUserFlow.stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                null,
+            )
+        val currentUserDto =
+            serverRepository.currentUserDtoFlow.stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                null,
+            )
 
         val seerrConnection = seerrServerRepository.connection
 

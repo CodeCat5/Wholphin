@@ -26,9 +26,10 @@ import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.QuickDetailsData
 import com.github.damontecres.wholphin.preferences.DisplayToggle
 import com.github.damontecres.wholphin.ui.dot
-import com.github.damontecres.wholphin.ui.getTimeFormatter
+import com.github.damontecres.wholphin.ui.formatTime
 import com.github.damontecres.wholphin.ui.util.LocalClock
 import com.github.damontecres.wholphin.ui.util.LocalInterfaceCustomization
+import org.jellyfin.sdk.model.DateTime
 import kotlin.time.Duration
 
 @Composable
@@ -37,6 +38,7 @@ fun QuickDetails(
     timeRemaining: Duration?,
     modifier: Modifier = Modifier,
     textStyle: TextStyle = MaterialTheme.typography.titleSmall,
+    endsAt: DateTime? = null,
 ) {
     val enabled = LocalInterfaceCustomization.current.enabledDisplayToggles
     val inlineContentMap = rememberQuickDetailsContentMap(textStyle)
@@ -53,7 +55,11 @@ fun QuickDetails(
                 QuickDetailsText(details.criticRating, Modifier, textStyle, inlineContentMap)
             }
         }
-        timeRemaining?.let { TimeRemaining(it, textStyle = textStyle) }
+        if (timeRemaining != null) {
+            TimeRemaining(timeRemaining, textStyle = textStyle)
+        } else if (endsAt != null) {
+            EndsAt(endsAt, textStyle = textStyle)
+        }
     }
 }
 
@@ -133,11 +139,25 @@ fun TimeRemaining(
     modifier: Modifier = Modifier,
     textStyle: TextStyle = MaterialTheme.typography.titleSmall,
 ) {
-    val resources = LocalResources.current
     val now by LocalClock.current.now
+    EndsAt(
+        endsAt = now.plusSeconds(remaining.inWholeSeconds),
+        modifier = modifier,
+        textStyle = textStyle,
+    )
+}
+
+@Composable
+fun EndsAt(
+    endsAt: DateTime,
+    modifier: Modifier = Modifier,
+    textStyle: TextStyle = MaterialTheme.typography.titleSmall,
+) {
+    val resources = LocalResources.current
+    val context = LocalContext.current
     val remainingStr =
-        remember(remaining, now, resources) {
-            val endTimeStr = getTimeFormatter().format(now.plusSeconds(remaining.inWholeSeconds))
+        remember(endsAt, resources, context) {
+            val endTimeStr = formatTime(context, endsAt)
             buildAnnotatedString {
                 dot()
                 append(resources.getString(R.string.ends_at, endTimeStr))

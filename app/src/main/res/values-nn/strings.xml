@@ -32,7 +32,7 @@
     <string name="director">Regissør</string>
     <string name="disabled">Deaktivert</string>
     <string name="discovered_servers">Funne servarar</string>
-    <string name="download_and_update"><![CDATA[Last ned og oppdater]]></string>
+    <string name="download_and_update">Last ned og oppdater</string>
     <string name="downloading">Lastar ned…</string>
     <string name="enabled">Aktivert</string>
     <string name="enter_server_url">Oppgi servar-IP eller URL</string>
@@ -64,7 +64,7 @@
     <string name="max_bitrate">Maks bitrate</string>
     <string name="more_like_this">Meir som dette</string>
     <string name="more">Meir</string>
-    <string name="movies">Filmar</string>
+    <string name="movies_title">Filmar</string>
     <string name="name">Namn</string>
     <string name="next_up">Neste</string>
     <string name="no_data">Ingen data</string>
@@ -74,7 +74,7 @@
     <string name="no_update_available">Ingen oppdatering tilgjengeleg</string>
     <string name="outro">Outro</string>
     <string name="path">Filveg</string>
-    <string name="people">Folk</string>
+    <string name="people_title">Folk</string>
     <string name="play_count">Antall avspelingar</string>
     <string name="play_from_here">Spel av herfrå</string>
     <string name="play">Spel av</string>
@@ -98,7 +98,7 @@
     <string name="restart">Start på nytt</string>
     <string name="resume">Hald fram</string>
     <string name="save">Lagre</string>
-    <string name="search_and_download"><![CDATA[Søk og last ned]]></string>
+    <string name="search_and_download">Søk og last ned</string>
     <string name="search">Søk</string>
     <string name="searching">Søker…</string>
     <string name="select_server">Vel servar</string>
@@ -122,16 +122,15 @@
     <string name="switch_servers">Byt servar</string>
     <string name="switch_user">Byt brukar</string>
     <string name="top_unwatched">Best vurderte usette</string>
-    <string name="trailer">Trailer</string>
     <plurals name="trailers">
         <item quantity="one">Trailerar</item>
-        <item quantity="other"/>
+        <item quantity="other">Trailerar</item>
     </plurals>
     <string name="tv_dvr_schedule">DVR-plan</string>
     <string name="tv_guide">Programoversikt</string>
     <string name="tv_season">Sesong</string>
     <string name="tv_seasons">Sesongar</string>
-    <string name="tv_shows">TV-seriar</string>
+    <string name="tv_shows_title">TV-seriar</string>
     <string name="ui_interface">Grensesnitt</string>
     <string name="unknown">Ukjend</string>
     <string name="updates">Oppdateringar</string>
@@ -140,7 +139,9 @@
     <string name="video">Video</string>
     <string name="videos">Videoar</string>
     <string name="watch_live">Sjå direkte</string>
-    <string name="years_old">%1$d år gammal</string>
+    <plurals name="years_old">
+        <item quantity="other">%1$d år gammal</item>
+    </plurals>
     <string name="play_with_transcoding">Spel av med transkoding</string>
     <string name="media_information">Mediainformasjon</string>
     <string name="show_clock">Vis klokke</string>
@@ -155,50 +156,50 @@
     <string name="success">Fullført</string>
     <string name="official_rating">Aldersgrense</string>
     <string name="runtime_sort">Speltid</string>
-    <string name="extras">Ekstra</string>
+    <string name="extras_title">Ekstra</string>
     <plurals name="other_extras">
         <item quantity="one">Anna</item>
-        <item quantity="other"/>
+        <item quantity="other">Anna</item>
     </plurals>
     <plurals name="behind_the_scenes">
         <item quantity="one">Bak kulissane</item>
-        <item quantity="other"/>
+        <item quantity="other">Bak kulissane</item>
     </plurals>
     <plurals name="theme_songs">
         <item quantity="one">Temasongar</item>
-        <item quantity="other"/>
+        <item quantity="other">Temasongar</item>
     </plurals>
     <plurals name="theme_videos">
         <item quantity="one">Temavideoar</item>
-        <item quantity="other"/>
+        <item quantity="other">Temavideoar</item>
     </plurals>
     <plurals name="clips">
         <item quantity="one">Klipp</item>
-        <item quantity="other"/>
+        <item quantity="other">Klipp</item>
     </plurals>
     <plurals name="deleted_scenes">
         <item quantity="one">Sletta sener</item>
-        <item quantity="other"/>
+        <item quantity="other">Sletta sener</item>
     </plurals>
     <plurals name="interviews">
         <item quantity="one">Intervju</item>
-        <item quantity="other"/>
+        <item quantity="other">Intervju</item>
     </plurals>
     <plurals name="scenes">
         <item quantity="one">Scener</item>
-        <item quantity="other"/>
+        <item quantity="other">Scener</item>
     </plurals>
     <plurals name="samples">
         <item quantity="one">Smakebitar</item>
-        <item quantity="other"/>
+        <item quantity="other">Smakebitar</item>
     </plurals>
     <plurals name="featurettes">
         <item quantity="one">Bakomfilmar</item>
-        <item quantity="other"/>
+        <item quantity="other">Bakomfilmar</item>
     </plurals>
     <plurals name="shorts">
         <item quantity="one">Kortfilmar</item>
-        <item quantity="other"/>
+        <item quantity="other">Kortfilmar</item>
     </plurals>
     <string name="advanced_settings">Avanserte innstillingar</string>
     <string name="advanced_ui">Avansert grensesnitt</string>
@@ -208,7 +209,7 @@
     <string name="auto_play_next">Spel neste automatisk</string>
     <string name="check_for_updates">Sjekk etter oppdateringar</string>
     <string name="combine_continue_next_summary">Gjeld berre TV-seriar</string>
-    <string name="combine_continue_next"><![CDATA[Slå saman \'Hald fram med å sjå\' og \'Neste\']]></string>
+    <string name="combine_continue_next">Slå saman \'Hald fram med å sjå\' og \'Neste\'</string>
     <string name="direct_play_ass">Direkteavspeling av ASS-undertekstar</string>
     <string name="direct_play_pgs">Direkteavspeling av PGS-undertekstar</string>
     <string name="downmix_stereo">Alltid nedmiks til stereo</string>
@@ -292,7 +293,7 @@
     <string name="aspect_ratio">Bileteforhold</string>
     <string name="show_details">Vis detaljar</string>
     <string name="image_type">Bilettype</string>
-    <string name="cast_and_crew"><![CDATA[Skodespelarar og medarbeidarar]]></string>
+    <string name="cast_and_crew">Skodespelarar og medarbeidarar</string>
     <string name="guest_stars">Gjesteroller</string>
     <string name="edge_size">Kantstorleik</string>
     <string name="refresh_rate_switching">Byting av bildeoppdateringsfrekvens</string>
@@ -378,7 +379,7 @@
     <string name="voice_error_start_failed">Klarte ikkje starta talegjenkjenning</string>
     <string name="voice_error_timeout">Tidsavbrot for talegjenkjenning</string>
     <string name="retry">Prøv på nytt</string>
-    <string name="favorite_items">Favoritt %s</string>
+    <string name="favorite_items_title">Favoritt %s</string>
     <string name="resolution_switching">Oppløysingsbyte</string>
     <string name="local">Lokal</string>
     <string name="play_trailer">Spel trailer</string>
@@ -518,12 +519,12 @@
     <string name="image_type_thumb">Miniatyr</string>
     <string name="backdrop_style_dynamic">Bilete med dynamisk farge</string>
     <string name="backdrop_style_image">Berre bilete</string>
-    <string name="enter_url_api_key"><![CDATA[Skriv inn URL og API-nøkkel]]></string>
+    <string name="enter_url_api_key">Skriv inn URL og API-nøkkel</string>
     <string name="api_key">API-nøkkel</string>
     <string name="seerr_login">Logg inn på Seerr-tenar</string>
     <string name="seerr_jellyfin_user">Jellyfin-brukar</string>
     <string name="seerr_local_user">Lokal brukar</string>
-    <string name="search_and_download_subtitles"><![CDATA[Søk og last ned undertekstar]]></string>
+    <string name="search_and_download_subtitles">Søk og last ned undertekstar</string>
     <string name="no_subtitles_found">Fann ingen eksterne undertekstar</string>
     <string name="series_continueing">No</string>
     <string name="in_app_screensaver">Bruk skjermsparar i appen</string>

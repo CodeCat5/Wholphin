@@ -14,6 +14,7 @@ import com.github.damontecres.wholphin.data.model.LibraryDisplayInfo
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
+import com.github.damontecres.wholphin.services.FilterOptionCache
 import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.services.KeyValueService
 import com.github.damontecres.wholphin.services.MediaManagementService
@@ -33,19 +34,19 @@ import com.github.damontecres.wholphin.ui.launchDefault
 import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.toServerString
-import com.github.damontecres.wholphin.ui.util.FilterUtils
 import com.github.damontecres.wholphin.ui.util.ResStringProvider
 import com.github.damontecres.wholphin.util.ApiRequestPager
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.GetItemsRequestHandler
 import com.github.damontecres.wholphin.util.HomeRowLoadingState
 import com.github.damontecres.wholphin.util.LoadingState
+import com.github.damontecres.wholphin.util.WholphinDispatchers
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +91,7 @@ class CollectionViewModel
         private val imageUrlService: ImageUrlService,
         private val musicService: MusicService,
         val mediaReportService: MediaReportService,
+        private val filterOptionCache: FilterOptionCache,
         @Assisted private val itemId: UUID,
     ) : ViewModel() {
         @AssistedFactory
@@ -135,26 +137,33 @@ class CollectionViewModel
                     }
                 }
             viewModelScope.launchDefault {
-                val collection =
-                    api.userLibraryApi
-                        .getItem(itemId)
-                        .content
-                        .let { BaseItem(it, false) }
-                backdropService.submit(collection)
-                val logoImageUrl =
-                    if (ImageType.LOGO in collection.data.imageTags.orEmpty()) {
-                        imageUrlService.getItemImageUrl(collection, ImageType.LOGO)
-                    } else {
-                        null
+                try {
+                    val collection =
+                        api.userLibraryApi
+                            .getItem(itemId)
+                            .content
+                            .let { BaseItem(it, false) }
+                    backdropService.submit(collection)
+                    val logoImageUrl =
+                        if (ImageType.LOGO in collection.data.imageTags.orEmpty()) {
+                            imageUrlService.getItemImageUrl(collection, ImageType.LOGO)
+                        } else {
+                            null
+                        }
+                    _state.update {
+                        it.copy(
+                            collection = collection,
+                            logoImageUrl = logoImageUrl,
+                        )
                     }
-                _state.update {
-                    it.copy(
-                        collection = collection,
-                        logoImageUrl = logoImageUrl,
-                    )
+                    listenForStateUpdates()
+                    themeSongPlayer.playThemeFor(itemId)
+                } catch (ex: CancellationException) {
+                    throw ex
+                } catch (ex: Exception) {
+                    Timber.e(ex, "Error getting collection %s", itemId)
+                    _state.update { it.copy(loadingState = LoadingState.Error(ex)) }
                 }
-                listenForStateUpdates()
-                themeSongPlayer.playThemeFor(itemId)
             }
         }
 
@@ -178,6 +187,8 @@ class CollectionViewModel
                     .collectLatest { (sort, filter, separateTypes) ->
                         try {
                             updateData(sort, filter, separateTypes)
+                        } catch (ex: CancellationException) {
+                            throw ex
                         } catch (ex: Exception) {
                             Timber.e(
                                 ex,
@@ -209,12 +220,16 @@ class CollectionViewModel
                 supervisorScope {
                     val jobs =
                         typesInCollection.map { type ->
-                            async(Dispatchers.IO) {
+                            async(WholphinDispatchers.IO) {
                                 val title = ResStringProvider(formatTypeName(type))
                                 val result =
                                     try {
                                         val pager = fetchItems(sort, filter, listOf(type))
-                                        HomeRowLoadingState.Success(title, pager)
+                                        HomeRowLoadingState.Success(
+                                            title,
+                                            pager,
+                                            showViewMore = false,
+                                        )
                                     } catch (ex: Exception) {
                                         Timber.e(
                                             ex,
@@ -348,15 +363,13 @@ class CollectionViewModel
         }
 
         suspend fun getPossibleFilterValues(filterOption: ItemFilterBy<*>): List<FilterValueOption> =
-            FilterUtils.getFilterOptionValues(
-                api,
-                serverRepository.currentUser?.id,
+            filterOptionCache.getFilterOptionValues(
                 itemId,
                 filterOption,
             )
 
         suspend fun letterPosition(letter: Char): Int =
-            withContext(Dispatchers.IO) {
+            withContext(WholphinDispatchers.IO) {
                 val sort = state.value.sortAndDirection
                 val filter = state.value.itemFilter
                 val request =
@@ -384,7 +397,7 @@ class CollectionViewModel
             itemId: UUID,
             played: Boolean,
             position: RowColumn?,
-        ) = viewModelScope.launch(Dispatchers.IO + ExceptionHandler()) {
+        ) = viewModelScope.launch(WholphinDispatchers.IO + ExceptionHandler()) {
             favoriteWatchManager.setWatched(itemId, played)
             if (itemId == state.value.collection?.id) {
                 refreshCollection()
@@ -397,7 +410,7 @@ class CollectionViewModel
             itemId: UUID,
             favorite: Boolean,
             position: RowColumn?,
-        ) = viewModelScope.launch(ExceptionHandler() + Dispatchers.IO) {
+        ) = viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
             favoriteWatchManager.setFavorite(itemId, favorite)
             if (itemId == state.value.collection?.id) {
                 refreshCollection()
@@ -486,6 +499,9 @@ class CollectionViewModel
                     BaseItemKind.EPISODE,
                     BaseItemKind.VIDEO,
                     BaseItemKind.BOX_SET,
+                    BaseItemKind.MUSIC_ARTIST,
+                    BaseItemKind.MUSIC_ALBUM,
+                    BaseItemKind.MUSIC_VIDEO,
                 )
 
             const val VIEW_OPTIONS_KEY = "CollectionViewOptions"

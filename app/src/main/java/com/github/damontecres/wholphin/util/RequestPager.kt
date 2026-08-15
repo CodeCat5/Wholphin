@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import com.github.damontecres.wholphin.ui.DEFAULT_PAGE_SIZE
 import com.google.common.cache.CacheBuilder
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -25,7 +24,7 @@ import java.util.function.Predicate
  */
 abstract class RequestPager<T>(
     protected val scope: CoroutineScope,
-    protected val pageSize: Int = DEFAULT_PAGE_SIZE,
+    val pageSize: Int = DEFAULT_PAGE_SIZE,
     cacheSize: Long = 8,
 ) : AbstractList<T?>(),
     BlockingList<T?> {
@@ -85,7 +84,7 @@ abstract class RequestPager<T>(
         get() = totalCount
 
     private fun fetchPage(position: Int): Job =
-        scope.launch(ExceptionHandler() + Dispatchers.IO) {
+        scope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
             fetchPageBlocking(position, false)
         }
 

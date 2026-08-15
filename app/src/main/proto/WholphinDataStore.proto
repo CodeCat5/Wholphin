@@ -87,6 +87,13 @@ message PlaybackPreferences {
   bool resolution_switching = 23;
   string external_player = 24;
   bool cinema_mode = 25;
+  DpadSeekMode dpad_seek_mode = 26;
+}
+
+enum DpadSeekMode {
+  SEEKBAR_MINIMAL = 0;
+  SEEKBAR_TRICKPLAY = 1;
+  SEEKBAR_NONE = 2;
 }
 
 message HomePagePreferences{
@@ -113,6 +120,8 @@ enum AppThemeColors {
   ORANGE = 3;
   BOLD_BLUE = 4;
   OLED_BLACK = 5;
+  RED = 6;
+  BROWN = 7;
 }
 
 enum EdgeStyle{
@@ -141,6 +150,7 @@ message SubtitlePreferences{
   int32 margin = 11;
   int32 edge_thickness = 12;
   int32 image_subtitle_opacity = 13;
+  bool use_separate_hdr = 14;
 }
 
 message LiveTvPreferences {
@@ -180,7 +190,7 @@ enum DisplayToggle{
 message InterfacePreferences {
   ThemeSongVolume play_theme_songs = 1;
   bool remember_selected_tab = 2;
-  map<string, int32> remembered_tabs = 3;
+  map<string, int32> remembered_tabs = 3 [deprecated = true];
   AppThemeColors app_theme_colors = 4;
   bool nav_drawer_switch_on_focus = 5;
   bool show_clock = 6;
@@ -212,6 +222,13 @@ message MusicPreferences {
   bool show_backdrop = 4;
 }
 
+message ExperimentalPreferences {
+  bool enabled = 1;
+  bool video_tunneling_enabled = 2;
+  bool prefer_ac3_surround = 3;
+  bool disable_audio_offload = 4;
+}
+
 message AppPreferences {
   // The currently signed in server and user IDs, mostly for restoring a session
   string current_server_id = 1;
@@ -229,4 +246,5 @@ message AppPreferences {
   bool sign_in_automatically = 11;
   PhotoPreferences photo_preferences = 12;
   MusicPreferences music_preferences = 13;
+  ExperimentalPreferences experimental_preferences = 14;
 }

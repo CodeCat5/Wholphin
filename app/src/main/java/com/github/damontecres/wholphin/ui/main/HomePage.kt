@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
@@ -88,8 +89,8 @@ import com.github.damontecres.wholphin.ui.util.ScrollToTopBringIntoViewSpec
 import com.github.damontecres.wholphin.util.HomeRowLoadingState
 import com.github.damontecres.wholphin.util.LoadingState
 import kotlinx.coroutines.delay
+import org.jellyfin.sdk.model.DateTime
 import org.jellyfin.sdk.model.api.BaseItemKind
-import org.jellyfin.sdk.model.api.MediaType
 import timber.log.Timber
 import java.util.UUID
 import kotlin.time.Duration
@@ -102,8 +103,9 @@ fun HomePage(
     playlistViewModel: AddPlaylistViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
+    LifecycleStartEffect(Unit) {
         viewModel.init()
+        onStopOrDispose { }
     }
     val state by viewModel.state.collectAsState()
     val loading = state.loadingState
@@ -174,7 +176,7 @@ fun HomePage(
                                         onClickWatch = viewModel::setWatched,
                                         onClickFavorite = viewModel::setFavorite,
                                         onClickAddPlaylist = { itemId ->
-                                            playlistViewModel.loadPlaylists(MediaType.VIDEO)
+                                            playlistViewModel.loadPlaylists()
                                             showPlaylistDialog = itemId
                                         },
                                         onSendMediaInfo = viewModel.mediaReportService::sendReportFor,
@@ -255,6 +257,7 @@ fun HomePage(
                         playlistViewModel.createPlaylistAndAddItem(it, itemId)
                         showPlaylistDialog = null
                     },
+                    onSearch = playlistViewModel::loadPlaylists,
                     elevation = 3.dp,
                 )
             }
@@ -361,7 +364,7 @@ fun HomePageContent(
             ) {
                 LazyColumn(
                     state = listState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
                     contentPadding =
                         PaddingValues(
                             bottom = Cards.height2x3,
@@ -371,6 +374,10 @@ fun HomePageContent(
                             .focusRestorer(),
                 ) {
                     itemsIndexed(homeRows) { rowIndex, row ->
+                        val rowModifier =
+                            Modifier
+                                .animateItem(placementSpec = null)
+                                .padding(bottom = 8.dp)
                         CompositionLocalProvider(
                             LocalBringIntoViewSpec provides defaultBringIntoViewSpec,
                         ) {
@@ -381,7 +388,7 @@ fun HomePageContent(
                                     FocusableItemRow(
                                         title = r.title.getString(),
                                         subtitle = stringResource(R.string.loading),
-                                        modifier = Modifier.animateItem(),
+                                        modifier = rowModifier,
                                     )
                                 }
 
@@ -390,7 +397,7 @@ fun HomePageContent(
                                         title = r.title.getString(),
                                         subtitle = r.localizedMessage,
                                         isError = true,
-                                        modifier = Modifier.animateItem(),
+                                        modifier = rowModifier,
                                     )
                                 }
 
@@ -422,11 +429,10 @@ fun HomePageContent(
                                                     }
                                                 },
                                             modifier =
-                                                Modifier
+                                                rowModifier
                                                     .fillMaxWidth()
                                                     .focusGroup()
-                                                    .focusRequester(rowFocusRequesters[rowIndex])
-                                                    .animateItem(),
+                                                    .focusRequester(rowFocusRequesters[rowIndex]),
                                             horizontalPadding = viewOptions.spacing.dp,
                                             cardContent = { index, item, cardModifier, onClick, onLongClick ->
                                                 val onFocus =
@@ -469,7 +475,7 @@ fun HomePageContent(
                                                             .onKeyEvent { onKey(it) },
                                                 )
                                             },
-                                            showViewMore = showViewMore,
+                                            showViewMore = showViewMore && row.showViewMore,
                                             viewMoreCardContent = { mod ->
                                                 HomePageViewMoreCard(
                                                     isEpisode = row.items.last()?.type == BaseItemKind.EPISODE,
@@ -502,7 +508,7 @@ fun HomePageContent(
                                         FocusableItemRow(
                                             title = r.title.getString(),
                                             subtitle = stringResource(R.string.no_results),
-                                            modifier = Modifier.animateItem(),
+                                            modifier = rowModifier,
                                         )
                                     }
                                 }
@@ -547,6 +553,7 @@ fun HomePageHeader(
         overviewTwoLines = isEpisode,
         quickDetails = item?.ui?.quickDetails,
         timeRemaining = item?.timeRemainingOrRuntime,
+        endsAt = item?.data?.endDate,
         showLogo = showLogo,
         logoImageUrl = rememberLogoUrl(item),
         modifier = modifier,
@@ -561,6 +568,7 @@ fun HomePageHeader(
     overviewTwoLines: Boolean,
     quickDetails: QuickDetailsData?,
     timeRemaining: Duration?,
+    endsAt: DateTime?,
     showLogo: Boolean,
     logoImageUrl: String?,
     modifier: Modifier = Modifier,
@@ -584,7 +592,7 @@ fun HomePageHeader(
             if (subtitle != null) {
                 EpisodeName(subtitle)
             }
-            QuickDetails(quickDetails, timeRemaining)
+            QuickDetails(quickDetails, timeRemaining, endsAt = endsAt)
             val overviewModifier =
                 Modifier
                     .padding(0.dp)

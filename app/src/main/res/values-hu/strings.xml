@@ -25,7 +25,7 @@
     <string name="director">Rendező</string>
     <string name="disabled">Letiltva</string>
     <string name="discovered_servers">Felfedezett szerverek</string>
-    <string name="download_and_update"><![CDATA[Letöltés & Frissítés]]></string>
+    <string name="download_and_update">Letöltés &amp; Frissítés</string>
     <string name="downloading">Letöltés folyamatban…</string>
     <string name="enabled">Engedélyezve</string>
     <string name="enter_server_url">Adja meg a szerver IP-t vagy URL-t</string>
@@ -62,7 +62,7 @@
     <string name="max_bitrate">Maximális bitráta</string>
     <string name="more_like_this">Hasonlóak</string>
     <string name="more">Továbbiak</string>
-    <string name="movies">Filmek</string>
+    <string name="movies_title">Filmek</string>
     <string name="name">Név</string>
     <string name="next_up">Következő</string>
     <string name="no_data">Nincs adat</string>
@@ -72,7 +72,7 @@
     <string name="none">Nincs</string>
     <string name="outro">Stáblista</string>
     <string name="path">Elérési út</string>
-    <string name="people">Stábtagok</string>
+    <string name="people_title">Stábtagok</string>
     <string name="play_count">Lejátszások száma</string>
     <string name="play_from_here">Lejátszás innen</string>
     <string name="play">Lejátszás</string>
@@ -95,7 +95,7 @@
     <string name="restart">Újraindítás</string>
     <string name="resume">Folytatás</string>
     <string name="save">Mentés</string>
-    <string name="search_and_download"><![CDATA[Keresés & Letöltés]]></string>
+    <string name="search_and_download">Keresés &amp; Letöltés</string>
     <string name="search">Keresés</string>
     <string name="searching">Keresés…</string>
     <string name="select_server">Szerver kiválasztása</string>
@@ -120,16 +120,15 @@
     <string name="switch_servers">Váltás másik szerverre</string>
     <string name="switch_user">Váltás</string>
     <string name="top_unwatched">Legjobbra értékelt, nem megnézett</string>
-    <string name="trailer">Előzetes</string>
     <plurals name="trailers">
         <item quantity="one">Előzetesek</item>
-        <item quantity="other"/>
+        <item quantity="other">Előzetesek</item>
     </plurals>
     <string name="tv_dvr_schedule">DVR Időzítés</string>
     <string name="tv_guide">Műsorújság</string>
     <string name="tv_season">Évad</string>
     <string name="tv_seasons">Évadok</string>
-    <string name="tv_shows">Sorozatok</string>
+    <string name="tv_shows_title">Sorozatok</string>
     <string name="ui_interface">Kezelőfelület</string>
     <string name="unknown">Ismeretlen</string>
     <string name="updates">Frissítések</string>
@@ -138,7 +137,9 @@
     <string name="video">Videó</string>
     <string name="videos">Videók</string>
     <string name="watch_live">Nézze élőben</string>
-    <string name="years_old">%1$d éves</string>
+    <plurals name="years_old">
+        <item quantity="other">%1$d éves</item>
+    </plurals>
     <string name="play_with_transcoding">Lejátszás átalakítással</string>
     <string name="show_clock">Aktuális idő mutatása</string>
     <string name="aired_episode_order">Sorrend epizód vetítése alapján</string>
@@ -152,14 +153,14 @@
     <string name="success">Sikeres</string>
     <string name="official_rating">Korhatár-besorolás</string>
     <string name="runtime_sort">Hossz</string>
-    <string name="extras">Extrák</string>
+    <string name="extras_title">Extrák</string>
     <plurals name="other_extras">
         <item quantity="one">Egyéb</item>
         <item quantity="other">Egyebek</item>
     </plurals>
     <plurals name="behind_the_scenes">
         <item quantity="one">Színfalak mögött</item>
-        <item quantity="other"/>
+        <item quantity="other">Színfalak mögött</item>
     </plurals>
     <plurals name="theme_songs">
         <item quantity="one">Főcímdal</item>
@@ -353,10 +354,10 @@
     <string name="subtitle_delay">Felirat késleltetése</string>
     <string name="backdrop_display">Háttér stílusa</string>
     <string name="enter_server_address">Adja meg a szerver címét</string>
-    <string name="combine_continue_next"><![CDATA[Folytatás & Következő menü összevonása]]></string>
+    <string name="combine_continue_next">Folytatás &amp; Következő menü összevonása</string>
     <string name="player_backend">Lejátszás backend</string>
     <string name="image_cache_size">Kép-gyorsítótár mérete (MB)</string>
-    <string name="cast_and_crew"><![CDATA[Stábtagok]]></string>
+    <string name="cast_and_crew">Stábtagok</string>
     <string name="nav_drawer_switch_on_focus">Navigációs menü oldalainak váltása fókusznál</string>
     <string name="playback_overrides">Lejátszás felülbírálatai</string>
     <string name="resolution_switching">Felbontásváltás</string>

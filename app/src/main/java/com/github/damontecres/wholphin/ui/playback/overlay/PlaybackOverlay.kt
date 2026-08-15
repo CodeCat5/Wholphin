@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,15 +44,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.Chapter
-import com.github.damontecres.wholphin.data.model.Playlist
-import com.github.damontecres.wholphin.data.model.aspectRatioFloat
+import com.github.damontecres.wholphin.data.model.PlaylistItem
 import com.github.damontecres.wholphin.ui.AppColors
-import com.github.damontecres.wholphin.ui.AspectRatios
 import com.github.damontecres.wholphin.ui.LocalImageUrlService
 import com.github.damontecres.wholphin.ui.components.TimeDisplay
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
@@ -65,7 +60,6 @@ import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.TrickplayInfo
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The overlay during playback showing controls, seek preview image, debug info, etc
@@ -91,10 +85,10 @@ fun PlaybackOverlay(
     currentPlayback: CurrentPlayback?,
     currentSegment: MediaSegmentDto?,
     analyticsState: AnalyticsState,
+    queue: List<PlaylistItem>,
     modifier: Modifier = Modifier,
     trickplayInfo: TrickplayInfo? = null,
     trickplayUrlFor: (Int) -> String? = { null },
-    playlist: Playlist = Playlist(listOf(), 0),
     onClickPlaylist: (BaseItem) -> Unit = {},
     seekBarInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
@@ -106,11 +100,11 @@ fun PlaybackOverlay(
     val density = LocalDensity.current
 
     val titleHeight =
-        remember(item?.title) {
+        remember(item?.title, density) {
             if (item?.title.isNotNullOrBlank()) with(density) { titleTextSize.toDp() } else 0.dp
         }
     val subtitleHeight =
-        remember(item?.subtitleLong) {
+        remember(item?.subtitleLong, density) {
             if (item?.subtitleLong.isNotNullOrBlank()) with(density) { subtitleTextSize.toDp() } else 0.dp
         }
 
@@ -180,10 +174,10 @@ fun PlaybackOverlay(
                         }
                     }
                     val nextState =
-                        remember(chapters, playlist) {
+                        remember(chapters, nextEnabled) {
                             if (chapters.isNotEmpty()) {
                                 OverlayViewState.CHAPTERS
-                            } else if (playlist.hasNext()) {
+                            } else if (nextEnabled) {
                                 OverlayViewState.QUEUE
                             } else {
                                 null
@@ -225,8 +219,7 @@ fun PlaybackOverlay(
                             player = player,
                             controllerViewState = controllerViewState,
                             chapters = chapters,
-                            playlist = playlist,
-                            aspectRatio = item?.data?.aspectRatioFloat ?: AspectRatios.WIDE,
+                            hasNext = nextEnabled,
                             onChangeState = onChangeState,
                             modifier =
                                 Modifier
@@ -237,9 +230,9 @@ fun PlaybackOverlay(
                 }
 
                 OverlayViewState.QUEUE -> {
-                    if (playlist.hasNext()) {
+                    if (nextEnabled) {
                         QueueRowOverlay(
-                            playlist = playlist,
+                            queue = queue,
                             controllerViewState = controllerViewState,
                             nextState =
                                 remember(chapters) {
@@ -289,31 +282,10 @@ fun PlaybackOverlay(
                                 xPercentage = seekProgressPercent.coerceIn(0f, 1f),
                             ).padding(bottom = controllerHeight - titleHeight - subtitleHeight),
                 ) {
-                    if (trickplayInfo != null) {
-                        val tilesPerImage = trickplayInfo.tileWidth * trickplayInfo.tileHeight
-                        val index =
-                            (seekProgressMs / trickplayInfo.interval).toInt() / tilesPerImage
-                        val imageUrl = remember(index) { trickplayUrlFor(index) }
-
-                        if (imageUrl != null) {
-                            SeekPreviewImage(
-                                modifier = Modifier,
-                                previewImageUrl = imageUrl,
-                                seekProgressMs = seekProgressMs,
-                                trickPlayInfo = trickplayInfo,
-                            )
-                        }
-                    }
-                    Text(
-                        text = (seekProgressMs / 1000L).seconds.toString(),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier =
-                            Modifier
-                                .background(
-                                    Color.Black.copy(alpha = 0.6f),
-                                    shape = RoundedCornerShape(4.dp),
-                                ).padding(horizontal = 8.dp, vertical = 4.dp),
+                    TrickplayPreview(
+                        seekProgressMs = seekProgressMs,
+                        trickplayInfo = trickplayInfo,
+                        trickplayUrlFor = trickplayUrlFor,
                     )
                 }
             }
