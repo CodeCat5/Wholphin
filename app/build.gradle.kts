@@ -34,7 +34,9 @@ val av1ModuleExists =
 val mpvModuleExists =
     providers.provider { project.file("libs/wholphin-mpv-release.aar").exists() }
 val extensionsRepoActive =
-    providers.provider { project.hasProperty("WholphinExtensionsUsername") }
+    providers.provider {
+        !(project.findProperty("WholphinExtensionsUsername") as String?).isNullOrBlank()
+    }
 
 // See https://issuetracker.google.com/issues/402800800
 val isBuildingBundle =
