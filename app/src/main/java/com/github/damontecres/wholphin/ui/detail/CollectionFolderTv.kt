@@ -25,6 +25,7 @@ import com.github.damontecres.wholphin.ui.components.RecommendedTvShow
 import com.github.damontecres.wholphin.ui.components.StudioCardGrid
 import com.github.damontecres.wholphin.ui.components.TabDetails
 import com.github.damontecres.wholphin.ui.components.TabbedPage
+import com.github.damontecres.wholphin.ui.components.UpcomingTvShow
 import com.github.damontecres.wholphin.ui.components.ViewOptionsPoster
 import com.github.damontecres.wholphin.ui.data.SeriesSortOptions
 import com.github.damontecres.wholphin.ui.nav.Destination
@@ -52,6 +53,7 @@ fun CollectionFolderTv(
             listOf(
                 TabDetails(R.string.recommended),
                 TabDetails(R.string.library),
+                TabDetails(R.string.upcoming_episodes),
                 TabDetails(R.string.genres),
                 TabDetails(R.string.studios),
             )
@@ -117,8 +119,19 @@ fun CollectionFolderTv(
                 )
             }
 
-            // Genres
+            // Upcoming
             2 -> {
+                UpcomingTvShow(
+                    parentId = destination.itemId,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .focusRequester(tabDetails.contentFocusRequester),
+                )
+            }
+
+            // Genres
+            3 -> {
                 GenreCardGrid(
                     itemId = destination.itemId,
                     includeItemTypes = listOf(BaseItemKind.SERIES),
@@ -131,7 +144,7 @@ fun CollectionFolderTv(
             }
 
             // Studios
-            3 -> {
+            4 -> {
                 StudioCardGrid(
                     itemId = destination.itemId,
                     includeItemTypes = listOf(BaseItemKind.SERIES),

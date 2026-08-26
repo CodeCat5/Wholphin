@@ -28,6 +28,7 @@ import com.github.damontecres.wholphin.services.TrailerService
 import com.github.damontecres.wholphin.services.UserPreferencesService
 import com.github.damontecres.wholphin.services.deleteItem
 import com.github.damontecres.wholphin.ui.ItemRowFields
+import com.github.damontecres.wholphin.ui.SlimItemFields
 import com.github.damontecres.wholphin.ui.equalsNotNull
 import com.github.damontecres.wholphin.ui.gt
 import com.github.damontecres.wholphin.ui.launchDefault
@@ -78,6 +79,7 @@ import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetEpisodesRequest
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
+import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
 import timber.log.Timber
 import java.util.UUID
 
@@ -195,6 +197,25 @@ class SeriesViewModel
                     }
                 }
                 val remoteTrailers = trailerService.getRemoteTrailers(series)
+                viewModelScope.launchIO {
+                    val upcoming =
+                        try {
+                            api.tvShowsApi
+                                .getUpcomingEpisodes(
+                                    GetUpcomingEpisodesRequest(
+                                        parentId = seriesId,
+                                        fields = SlimItemFields,
+                                        enableUserData = true,
+                                        limit = 10,
+                                    ),
+                                ).content.items
+                                .map { BaseItem(it) }
+                        } catch (ex: Exception) {
+                            Timber.e(ex, "Error fetching upcoming episodes for series %s", seriesId)
+                            emptyList()
+                        }
+                    _state.update { it.copy(upcoming = upcoming) }
+                }
                 this@SeriesViewModel.position.update {
                     it.copy(
                         episodeRowIndex =
@@ -839,4 +860,5 @@ data class SeriesState(
     val discovered: List<DiscoverItem> = emptyList(),
     val discoverSeries: DiscoverItem? = null,
     val chosenStreams: ChosenStreams? = null,
+    val upcoming: List<BaseItem> = emptyList(),
 )

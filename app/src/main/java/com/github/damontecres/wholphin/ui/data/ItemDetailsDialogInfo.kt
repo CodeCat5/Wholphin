@@ -25,12 +25,14 @@ import com.github.damontecres.wholphin.ui.components.ScrollableDialog
 import com.github.damontecres.wholphin.ui.formatBitrate
 import com.github.damontecres.wholphin.ui.formatBytes
 import com.github.damontecres.wholphin.ui.formatDate
+import com.github.damontecres.wholphin.ui.formatDateTime
 import com.github.damontecres.wholphin.ui.formatDuration
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.letNotEmpty
 import com.github.damontecres.wholphin.ui.util.StreamFormatting.formatAudioCodec
 import com.github.damontecres.wholphin.ui.util.StreamFormatting.formatSubtitleCodec
 import com.github.damontecres.wholphin.util.languageName
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.MediaStream
 import org.jellyfin.sdk.model.api.MediaStreamType
@@ -47,6 +49,8 @@ data class ItemDetailsDialogInfo(
     val files: List<MediaSourceInfo>,
     val studios: List<String> = emptyList(),
     val lastPlayed: LocalDateTime? = null,
+    val unaired: Boolean = false,
+    val premiereDate: LocalDateTime? = null,
 ) {
     constructor(item: BaseItem) : this(
         title = item.name ?: "",
@@ -55,6 +59,8 @@ data class ItemDetailsDialogInfo(
         files = item.data.mediaSources.orEmpty(),
         studios = item.studioNames,
         lastPlayed = item.data.userData?.lastPlayedDate,
+        unaired = item.data.locationType == LocationType.VIRTUAL,
+        premiereDate = item.data.premiereDate,
     )
 }
 
@@ -78,6 +84,7 @@ fun ItemDetailsDialog(
     val unknown = stringResource(R.string.unknown)
     val runtimeLabel = stringResource(R.string.runtime_sort)
     val lastPlayedLabel = stringResource(R.string.last_played)
+    val unairedLabel = stringResource(R.string.unaired)
 
     ScrollableDialog(
         onDismissRequest = onDismissRequest,
@@ -91,6 +98,14 @@ fun ItemDetailsDialog(
                     text = info.title,
                     style = MaterialTheme.typography.headlineSmall,
                 )
+                if (info.unaired) {
+                    val airDate = remember(info.premiereDate) { info.premiereDate?.let { formatDateTime(it) } }
+                    Text(
+                        text = if (airDate != null) "$unairedLabel • $airDate" else unairedLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 if (info.studios.isNotEmpty()) {
                     Text(
                         text = info.studios.joinToString(", "),

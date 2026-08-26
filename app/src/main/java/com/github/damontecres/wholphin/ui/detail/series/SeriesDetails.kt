@@ -73,6 +73,7 @@ import com.github.damontecres.wholphin.ui.components.PersonContextActions
 import com.github.damontecres.wholphin.ui.components.QuickDetails
 import com.github.damontecres.wholphin.ui.components.TitleOrLogo
 import com.github.damontecres.wholphin.ui.components.TrailerButton
+import com.github.damontecres.wholphin.ui.components.UpcomingEpisodeCard
 import com.github.damontecres.wholphin.ui.data.AddPlaylistViewModel
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialogInfo
@@ -190,6 +191,7 @@ fun SeriesDetails(
                 trailers = state.trailers,
                 extras = state.extras,
                 people = state.people,
+                upcoming = state.upcoming,
                 similar = state.similar,
                 played = played,
                 favorite = series.data.userData?.isFavorite ?: false,
@@ -246,6 +248,7 @@ fun SeriesDetails(
                 onClickExtra = { _, extra ->
                     viewModel.navigateTo(extra.destination)
                 },
+                onClickUpcoming = { overviewDialog = ItemDetailsDialogInfo(it) },
                 discoverSeries = state.discoverSeries,
                 onClickDiscoverSeries = {
                     state.discoverSeries?.let {
@@ -317,7 +320,8 @@ private const val SEASONS_ROW = HEADER_ROW + 1
 private const val PEOPLE_ROW = SEASONS_ROW + 1
 private const val TRAILER_ROW = PEOPLE_ROW + 1
 private const val EXTRAS_ROW = TRAILER_ROW + 1
-private const val SIMILAR_ROW = EXTRAS_ROW + 1
+private const val UPCOMING_ROW = EXTRAS_ROW + 1
+private const val SIMILAR_ROW = UPCOMING_ROW + 1
 private const val DISCOVER_ROW = SIMILAR_ROW + 1
 
 @Composable
@@ -329,6 +333,7 @@ fun SeriesDetailsContent(
     trailers: List<Trailer>,
     extras: List<ExtrasItem>,
     people: List<Person>,
+    upcoming: List<BaseItem>,
     discovered: List<DiscoverItem>,
     played: Boolean,
     favorite: Boolean,
@@ -342,6 +347,7 @@ fun SeriesDetailsContent(
     favoriteOnClick: () -> Unit,
     trailerOnClick: (Trailer) -> Unit,
     onClickExtra: (Int, ExtrasItem) -> Unit,
+    onClickUpcoming: (BaseItem) -> Unit,
     onShowContextMenu: (ContextMenu) -> Unit,
     actions: ContextMenuActions,
     onClickDiscover: (Int, DiscoverItem) -> Unit,
@@ -577,6 +583,26 @@ fun SeriesDetailsContent(
                                 Modifier
                                     .fillMaxWidth()
                                     .focusRequester(focusRequesters[EXTRAS_ROW]),
+                        )
+                    }
+                }
+                if (upcoming.isNotEmpty()) {
+                    item {
+                        ItemRow(
+                            title = stringResource(R.string.upcoming_episodes),
+                            items = upcoming,
+                            onClickItem = { index, item ->
+                                position = UPCOMING_ROW
+                                onClickUpcoming.invoke(item)
+                            },
+                            onLongClickItem = { _, _ -> },
+                            cardContent = { index, item, mod, onClick, onLongClick ->
+                                UpcomingEpisodeCard(item, onClick, onLongClick, mod)
+                            },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(focusRequesters[UPCOMING_ROW]),
                         )
                     }
                 }
