@@ -7,6 +7,7 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomePageSettings
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
+import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.data.model.SUPPORTED_HOME_PAGE_SETTINGS_VERSION
 import com.github.damontecres.wholphin.data.model.createGenreDestination
 import com.github.damontecres.wholphin.data.model.createStudioDestination
@@ -581,6 +582,7 @@ class HomeSettingsService
             limit: Int = prefs.maxItemsPerRow,
             isRefresh: Boolean,
             usePaging: Boolean = false,
+            oneEpisodePerSeries: Boolean = false,
         ): HomeRowLoadingState =
             when (row) {
                 is HomeRowConfig.ContinueWatching -> {
@@ -1172,7 +1174,34 @@ class HomeSettingsService
                         )
                     }
                 }
-            }
+            }.maybeDedupeBySeries(row, oneEpisodePerSeries)
+
+        /**
+         * Applies [oneEpisodePerSeries] to the row's items, but only for row types where showing
+         * every episode of the same series is unlikely to be the point of the row (unlike e.g.
+         * Favorites, Genres, or Suggestions). Skipped for a still-paginating [ApiRequestPager], since
+         * fully deduping it would force it to eagerly load every page.
+         */
+        private fun HomeRowLoadingState.maybeDedupeBySeries(
+            row: HomeRowConfig,
+            oneEpisodePerSeries: Boolean,
+        ): HomeRowLoadingState {
+            if (this !is Success || items is ApiRequestPager<*>) return this
+            val eligible =
+                when (row) {
+                    is HomeRowConfig.ContinueWatching,
+                    is HomeRowConfig.NextUp,
+                    is HomeRowConfig.ContinueWatchingCombined,
+                    is HomeRowConfig.RecentlyAdded,
+                    is HomeRowConfig.RecentlyReleased,
+                    is HomeRowConfig.ByParent,
+                    is HomeRowConfig.GetItems,
+                    -> true
+                    else -> false
+                }
+            if (!eligible) return this
+            return copy(items = items.filterNotNull().maybeDedupeBySeries(oneEpisodePerSeries))
+        }
 
         companion object {
             const val CUSTOM_PREF_ID = "home_settings"

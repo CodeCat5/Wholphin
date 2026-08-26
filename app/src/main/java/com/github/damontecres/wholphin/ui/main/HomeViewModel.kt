@@ -79,6 +79,8 @@ class HomeViewModel
                 try {
                     val preferences = userPreferencesService.getCurrent()
                     val prefs = preferences.appPreferences.homePagePreferences
+                    val oneEpisodePerSeries =
+                        preferences.appPreferences.interfacePreferences.oneEpisodePerSeries
 
                     serverRepository.currentUserDto?.let { userDto ->
                         val libraries =
@@ -129,6 +131,7 @@ class HomeViewModel
                                                     libraries = libraries,
                                                     limit = prefs.maxItemsPerRow,
                                                     isRefresh = refresh,
+                                                    oneEpisodePerSeries = oneEpisodePerSeries,
                                                 )
                                             } catch (ex: InvalidStatusException) {
                                                 if (ex.status == 404) {

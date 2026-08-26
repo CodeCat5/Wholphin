@@ -35,6 +35,7 @@ private fun getRecommendedRows(
                 enableUserData = true,
                 enableTotalRecordCount = false,
             ),
+        dedupeBySeries = true,
     ),
     RecommendedRow(
         title = R.string.next_up,
@@ -48,6 +49,7 @@ private fun getRecommendedRows(
                 enableUserData = true,
                 enableRewatching = enableRewatching,
             ),
+        dedupeBySeries = true,
     ),
     RecommendedRow(
         title = R.string.recently_released,
@@ -75,6 +77,7 @@ private fun getRecommendedRows(
                 maxPremiereDate = LocalDateTime.now(),
                 isUnaired = false,
             ),
+        dedupeBySeries = true,
     ),
     RecommendedRow(
         title = R.string.recently_added,
@@ -90,6 +93,7 @@ private fun getRecommendedRows(
                 sortOrder = listOf(SortOrder.DESCENDING),
                 enableTotalRecordCount = false,
             ),
+        dedupeBySeries = true,
     ),
     RecommendedRow(
         title = R.string.top_unwatched,

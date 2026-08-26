@@ -5,6 +5,8 @@
 
 package com.github.damontecres.wholphin.services
 
+import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.dedupeBySeries
 import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.github.damontecres.wholphin.util.configure
 import com.github.damontecres.wholphin.util.reset
@@ -120,6 +122,69 @@ class LatestNextUpServiceTests {
             Assert.assertTrue(seriesId2 !in seriesIds)
             Assert.assertTrue(seriesIds.containsAll(listOf(seriesId3)))
         }
+
+    @Test
+    fun `Test dedupeBySeries drops later episodes from the same series`() {
+        val firstSeriesEpisodeId = UUID.randomUUID()
+        val laterSameSeriesId = UUID.randomUUID()
+        val otherSeriesId = UUID.randomUUID()
+
+        val firstSeriesEpisode =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns firstSeriesEpisodeId
+                every { seriesId } returns seriesId1
+            }
+        val laterSameSeries =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns laterSameSeriesId
+                every { seriesId } returns seriesId1
+            }
+        val otherSeries =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns otherSeriesId
+                every { seriesId } returns seriesId2
+            }
+
+        val input =
+            listOf(
+                BaseItem(firstSeriesEpisode),
+                BaseItem(laterSameSeries),
+                BaseItem(otherSeries),
+            )
+
+        val resultIds = input.dedupeBySeries().map { it.id }
+        Assert.assertEquals(2, resultIds.size)
+        Assert.assertTrue(firstSeriesEpisodeId in resultIds)
+        Assert.assertTrue(otherSeriesId in resultIds)
+        Assert.assertTrue("Later episode for same series should be dropped", laterSameSeriesId !in resultIds)
+    }
+
+    @Test
+    fun `Test dedupeBySeries preserves all episodes when each is from a different series`() {
+        val episode1Id = UUID.randomUUID()
+        val episode2Id = UUID.randomUUID()
+        val episode3Id = UUID.randomUUID()
+
+        val episode1 =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns episode1Id
+                every { seriesId } returns seriesId1
+            }
+        val episode2 =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns episode2Id
+                every { seriesId } returns seriesId2
+            }
+        val episode3 =
+            mockk<BaseItemDto>(relaxed = true) {
+                every { id } returns episode3Id
+                every { seriesId } returns seriesId3
+            }
+
+        val input = listOf(BaseItem(episode1), BaseItem(episode2), BaseItem(episode3))
+        val result = input.dedupeBySeries()
+        Assert.assertEquals(input.map { it.id }, result.map { it.id })
+    }
 
     fun buildRemoved(vararg values: Pair<UUID, LocalDateTime>): DisplayPreferencesDto =
         testDisplayPreferencesDto.copy(

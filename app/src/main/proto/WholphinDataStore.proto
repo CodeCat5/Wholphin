@@ -205,6 +205,7 @@ message InterfacePreferences {
   bool show_logos = 13;
   SearchPreferences search_preferences = 14;
   repeated DisplayToggle display_toggles = 15;
+  bool one_episode_per_series = 16;
 }
 
 message AdvancedPreferences {
