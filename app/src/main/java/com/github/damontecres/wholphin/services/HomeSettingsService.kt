@@ -587,13 +587,12 @@ class HomeSettingsService
             when (row) {
                 is HomeRowConfig.ContinueWatching -> {
                     val resume =
-                        latestNextUpService
-                            .getResume(
-                                userDto.id,
-                                limit,
-                                true,
-                                row.viewOptions.useSeries,
-                            ).maybeDedupeBySeries(oneEpisodePerSeries)
+                        latestNextUpService.getResume(
+                            userDto.id,
+                            limit,
+                            true,
+                            row.viewOptions.useSeries,
+                        )
 
                     Success(
                         title = ResStringProvider(R.string.continue_watching),
@@ -606,15 +605,14 @@ class HomeSettingsService
 
                 is HomeRowConfig.NextUp -> {
                     val nextUp =
-                        latestNextUpService
-                            .getNextUp(
-                                userDto.id,
-                                limit,
-                                prefs.enableRewatchingNextUp,
-                                false,
-                                prefs.maxDaysNextUp,
-                                row.viewOptions.useSeries,
-                            ).maybeDedupeBySeries(oneEpisodePerSeries)
+                        latestNextUpService.getNextUp(
+                            userDto.id,
+                            limit,
+                            prefs.enableRewatchingNextUp,
+                            false,
+                            prefs.maxDaysNextUp,
+                            row.viewOptions.useSeries,
+                        )
 
                     Success(
                         title = ResStringProvider(R.string.next_up),
@@ -642,10 +640,7 @@ class HomeSettingsService
                             prefs.maxDaysNextUp,
                             row.viewOptions.useSeries,
                         )
-                    val combined =
-                        latestNextUpService
-                            .buildCombined(resume, nextUp)
-                            .maybeDedupeBySeries(oneEpisodePerSeries)
+                    val combined = latestNextUpService.buildCombined(resume, nextUp)
 
                     Success(
                         title = ResStringProvider(R.string.continue_watching),
@@ -789,7 +784,6 @@ class HomeSettingsService
                             .getLatestMedia(request)
                             .content
                             .map { BaseItem(it, row.viewOptions.useSeries) }
-                            .maybeDedupeBySeries(oneEpisodePerSeries)
                             .let {
                                 Success(
                                     title,
@@ -842,7 +836,6 @@ class HomeSettingsService
                             .execute(api, request)
                             .content.items
                             .map { BaseItem.from(it, api, row.viewOptions.useSeries) }
-                            .maybeDedupeBySeries(oneEpisodePerSeries)
                     }.let {
                         Success(
                             title,
@@ -915,7 +908,6 @@ class HomeSettingsService
                             .execute(api, request)
                             .content.items
                             .map { BaseItem(it, row.viewOptions.useSeries) }
-                            .maybeDedupeBySeries(oneEpisodePerSeries)
                     }.let {
                         Success(
                             title,
@@ -954,7 +946,6 @@ class HomeSettingsService
                             .execute(api, request)
                             .content.items
                             .map { BaseItem(it, row.viewOptions.useSeries) }
-                            .maybeDedupeBySeries(oneEpisodePerSeries)
                     }.let {
                         Success(
                             StringStringProvider(row.name),
@@ -1183,7 +1174,34 @@ class HomeSettingsService
                         )
                     }
                 }
-            }
+            }.maybeDedupeBySeries(row, oneEpisodePerSeries)
+
+        /**
+         * Applies [oneEpisodePerSeries] to the row's items, but only for row types where showing
+         * every episode of the same series is unlikely to be the point of the row (unlike e.g.
+         * Favorites, Genres, or Suggestions). Skipped for a still-paginating [ApiRequestPager], since
+         * fully deduping it would force it to eagerly load every page.
+         */
+        private fun HomeRowLoadingState.maybeDedupeBySeries(
+            row: HomeRowConfig,
+            oneEpisodePerSeries: Boolean,
+        ): HomeRowLoadingState {
+            if (this !is Success || items is ApiRequestPager<*>) return this
+            val eligible =
+                when (row) {
+                    is HomeRowConfig.ContinueWatching,
+                    is HomeRowConfig.NextUp,
+                    is HomeRowConfig.ContinueWatchingCombined,
+                    is HomeRowConfig.RecentlyAdded,
+                    is HomeRowConfig.RecentlyReleased,
+                    is HomeRowConfig.ByParent,
+                    is HomeRowConfig.GetItems,
+                    -> true
+                    else -> false
+                }
+            if (!eligible) return this
+            return copy(items = items.filterNotNull().maybeDedupeBySeries(oneEpisodePerSeries))
+        }
 
         companion object {
             const val CUSTOM_PREF_ID = "home_settings"
