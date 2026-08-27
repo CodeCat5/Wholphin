@@ -404,3 +404,29 @@ val BaseItem.unavailabilityReason: UnavailabilityReason?
             UnavailabilityReason.UNAIRED
         }
     }
+
+/**
+ * Collapses individual played songs down to one entry per album, so a listening session doesn't
+ * flood a row with one card per track. Each collapsed entry is relabeled to represent its album
+ * (name and artwork) rather than the song that happened to be most recently played.
+ */
+fun List<BaseItem>.dedupeAudioByAlbum(): List<BaseItem> =
+    distinctBy { if (it.type == BaseItemKind.AUDIO) it.data.albumId ?: it.id else it.id }
+        .map { it.asAlbumIfAudio() }
+
+fun List<BaseItem>.maybeDedupeAudioByAlbum(enabled: Boolean): List<BaseItem> =
+    if (enabled) dedupeAudioByAlbum() else this
+
+private fun BaseItem.asAlbumIfAudio(): BaseItem =
+    if (type == BaseItemKind.AUDIO && data.albumId != null) {
+        copy(
+            data =
+                data.copy(
+                    id = data.albumId!!,
+                    name = data.album ?: data.name,
+                    type = BaseItemKind.MUSIC_ALBUM,
+                ),
+        )
+    } else {
+        this
+    }

@@ -20,6 +20,7 @@ import com.github.damontecres.wholphin.data.model.HomeRowConfig.RecentlyReleased
 import com.github.damontecres.wholphin.data.model.HomeRowConfig.Suggestions
 import com.github.damontecres.wholphin.data.model.HomeRowConfig.TvChannels
 import com.github.damontecres.wholphin.data.model.HomeRowConfig.TvPrograms
+import com.github.damontecres.wholphin.data.model.HomeRowConfig.WatchHistory
 import com.github.damontecres.wholphin.data.model.HomeRowViewOptions
 import com.github.damontecres.wholphin.data.model.SUPPORTED_HOME_PAGE_SETTINGS_VERSION
 import com.github.damontecres.wholphin.preferences.AppPreferences
@@ -249,6 +250,14 @@ class HomeSettingsViewModel
                                 id = id,
                                 title = ResStringProvider(R.string.combine_continue_next),
                                 config = ContinueWatchingCombined(),
+                            )
+                        }
+
+                        MetaRowType.WATCH_HISTORY -> {
+                            HomeRowConfigDisplay(
+                                id = id,
+                                title = ResStringProvider(R.string.watch_history),
+                                config = WatchHistory(),
                             )
                         }
 
@@ -701,6 +710,7 @@ class HomeSettingsViewModel
                                 is ContinueWatching,
                                 is NextUp,
                                 is ContinueWatchingCombined,
+                                is WatchHistory,
                                 -> {
                                     it.config.updateViewOptions(preset.continueWatching)
                                 }

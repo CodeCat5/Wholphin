@@ -55,6 +55,17 @@ sealed interface HomeRowConfig {
     }
 
     /**
+     * Everything the user has fully watched, most recently played first, across every library
+     */
+    @Serializable
+    @SerialName("WatchHistory")
+    data class WatchHistory(
+        override val viewOptions: HomeRowViewOptions = HomeRowViewOptions(),
+    ) : HomeRowConfig {
+        override fun updateViewOptions(viewOptions: HomeRowViewOptions): WatchHistory = this.copy(viewOptions = viewOptions)
+    }
+
+    /**
      * Media recently added to a library
      */
     @Serializable

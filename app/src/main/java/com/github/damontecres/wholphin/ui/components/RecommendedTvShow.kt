@@ -81,6 +81,24 @@ private fun getRecommendedRows(parentId: UUID) =
         ),
     )
 
+private fun watchHistoryRow(parentId: UUID) =
+    RecommendedRow(
+        title = R.string.watch_history,
+        handler = GetItemsRequestHandler,
+        request =
+            GetItemsRequest(
+                parentId = parentId,
+                fields = SlimItemFields,
+                includeItemTypes = listOf(BaseItemKind.EPISODE),
+                recursive = true,
+                enableUserData = true,
+                isPlayed = true,
+                sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                sortOrder = listOf(SortOrder.DESCENDING),
+                enableTotalRecordCount = false,
+            ),
+    )
+
 /**
  * The "recommended" tab of a TV show library
  */
@@ -98,6 +116,7 @@ fun RecommendedTvShow(
                     suggestionsType = BaseItemKind.SERIES,
                     recommendedRows = getRecommendedRows(parentId),
                     viewOptions = HomeRowViewOptions(),
+                    watchHistoryRow = watchHistoryRow(parentId),
                 )
             },
         ),

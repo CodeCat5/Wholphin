@@ -53,6 +53,9 @@ class TestHomeRowSamples {
                 HomeRowConfig.ContinueWatchingCombined(
                     viewOptions = HomeRowViewOptions(),
                 ),
+                HomeRowConfig.WatchHistory(
+                    viewOptions = HomeRowViewOptions(),
+                ),
                 HomeRowConfig.ByParent(
                     parentId = UUID.randomUUID(),
                     recursive = true,
@@ -88,6 +91,7 @@ class TestHomeRowSamples {
             when (it) {
                 is HomeRowConfig.ContinueWatching -> foundTypes.add(it::class)
                 is HomeRowConfig.ContinueWatchingCombined -> foundTypes.add(it::class)
+                is HomeRowConfig.WatchHistory -> foundTypes.add(it::class)
                 is HomeRowConfig.Genres -> foundTypes.add(it::class)
                 is HomeRowConfig.NextUp -> foundTypes.add(it::class)
                 is HomeRowConfig.RecentlyAdded -> foundTypes.add(it::class)

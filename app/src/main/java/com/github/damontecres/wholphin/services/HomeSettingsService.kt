@@ -7,6 +7,7 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomePageSettings
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
+import com.github.damontecres.wholphin.data.model.dedupeAudioByAlbum
 import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.data.model.SUPPORTED_HOME_PAGE_SETTINGS_VERSION
 import com.github.damontecres.wholphin.data.model.createGenreDestination
@@ -456,6 +457,14 @@ class HomeSettingsService
                     )
                 }
 
+                is HomeRowConfig.WatchHistory -> {
+                    HomeRowConfigDisplay(
+                        id,
+                        ResStringProvider(R.string.watch_history),
+                        config,
+                    )
+                }
+
                 is HomeRowConfig.Genres -> {
                     val title = getItemName(R.string.genres_in, config.parentId)
                     HomeRowConfigDisplay(
@@ -649,6 +658,52 @@ class HomeSettingsService
                         rowType = row,
                         showViewMore = combined.size >= limit,
                     )
+                }
+
+                is HomeRowConfig.WatchHistory -> {
+                    val title = ResStringProvider(R.string.watch_history)
+                    val request =
+                        GetItemsRequest(
+                            userId = userDto.id,
+                            fields = HomeItemFields,
+                            recursive = true,
+                            // Fetch extra raw items since multiple songs from the same album
+                            // collapse into a single entry below
+                            limit = limit * 4,
+                            includeItemTypes =
+                                listOf(
+                                    BaseItemKind.MOVIE,
+                                    BaseItemKind.EPISODE,
+                                    BaseItemKind.AUDIO,
+                                ),
+                            isPlayed = true,
+                            sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                            sortOrder = listOf(SortOrder.DESCENDING),
+                        )
+                    if (usePaging) {
+                        ApiRequestPager(
+                            api,
+                            request,
+                            GetItemsRequestHandler,
+                            scope,
+                            useSeriesForPrimary = row.viewOptions.useSeries,
+                        ).init()
+                    } else {
+                        GetItemsRequestHandler
+                            .execute(api, request)
+                            .content.items
+                            .map { BaseItem(it, row.viewOptions.useSeries) }
+                            .dedupeAudioByAlbum()
+                            .take(limit)
+                    }.let {
+                        Success(
+                            title,
+                            it,
+                            row.viewOptions,
+                            rowType = row,
+                            showViewMore = it.size >= limit,
+                        )
+                    }
                 }
 
                 is HomeRowConfig.Genres -> {

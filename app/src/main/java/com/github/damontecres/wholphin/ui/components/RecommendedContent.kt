@@ -17,6 +17,7 @@ import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomeRowViewOptions
+import com.github.damontecres.wholphin.data.model.maybeDedupeAudioByAlbum
 import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.UserPreferences
@@ -89,6 +90,7 @@ class RecommendedViewModel
         @Assisted private val suggestionsType: BaseItemKind,
         @Assisted private val recommendedRows: List<RecommendedRow<*>>,
         @Assisted private val viewOptions: HomeRowViewOptions,
+        @Assisted private val watchHistoryRow: RecommendedRow<*>? = null,
     ) : ViewModel() {
         @AssistedFactory
         interface Factory {
@@ -97,8 +99,19 @@ class RecommendedViewModel
                 suggestionsType: BaseItemKind,
                 recommendedRows: List<RecommendedRow<*>>,
                 viewOptions: HomeRowViewOptions,
+                watchHistoryRow: RecommendedRow<*>? = null,
             ): RecommendedViewModel
         }
+
+        /**
+         * Index of the Suggestions row, which always renders immediately after [recommendedRows].
+         */
+        private val suggestionsIndex get() = recommendedRows.size
+
+        /**
+         * Index of the Watch History row, which always renders as the very last row, after Suggestions.
+         */
+        private val watchHistoryIndex get() = suggestionsIndex + 1
 
         private val _state = MutableStateFlow(RecommendedState())
         val state: StateFlow<RecommendedState> = _state
@@ -116,7 +129,10 @@ class RecommendedViewModel
                         loading = LoadingState.Loading,
                         rows =
                             recommendedRows.map { HomeRowLoadingState.Loading(ResStringProvider(it.title)) } +
-                                listOf(HomeRowLoadingState.Loading(ResStringProvider(R.string.suggestions))),
+                                listOf(HomeRowLoadingState.Loading(ResStringProvider(R.string.suggestions))) +
+                                listOfNotNull(
+                                    watchHistoryRow?.let { HomeRowLoadingState.Loading(ResStringProvider(it.title)) },
+                                ),
                     )
                 }
                 val jobs =
@@ -148,6 +164,7 @@ class RecommendedViewModel
                         }
                     }
                 fetchSuggestions()
+                fetchWatchHistory(limit, oneEpisodePerSeries)
                 jobs.forEachIndexed { index, job ->
                     job.join()
                     val row = state.value.rows[index]
@@ -174,6 +191,7 @@ class RecommendedViewModel
                     .execute(api, request)
                     .toBaseItems(api, true)
                     .maybeDedupeBySeries(oneEpisodePerSeries && row.dedupeBySeries)
+                    .maybeDedupeAudioByAlbum(row.dedupeByAlbum)
             } else {
                 ApiRequestPager(
                     api,
@@ -245,7 +263,7 @@ class RecommendedViewModel
                                 it.copy(
                                     rows =
                                         it.rows.toMutableList().apply {
-                                            set(lastIndex, result)
+                                            set(suggestionsIndex, result)
                                         },
                                 )
                             }
@@ -258,10 +276,45 @@ class RecommendedViewModel
                         it.copy(
                             rows =
                                 it.rows.toMutableList().apply {
-                                    set(lastIndex, HomeRowLoadingState.Error(title, null, ex))
+                                    set(suggestionsIndex, HomeRowLoadingState.Error(title, null, ex))
                                 },
                         )
                     }
+                }
+            }
+        }
+
+        /**
+         * Fetches the Watch History row, if this page has one. Always renders as the very last row,
+         * after Suggestions.
+         */
+        private fun fetchWatchHistory(
+            limit: Int?,
+            oneEpisodePerSeries: Boolean,
+        ) {
+            val row = watchHistoryRow ?: return
+            viewModelScope.launchIO {
+                val title = ResStringProvider(row.title)
+                val result =
+                    try {
+                        val items = execute(row, limit, oneEpisodePerSeries)
+                        HomeRowLoadingState.Success(
+                            title,
+                            items,
+                            viewOptions,
+                            showViewMore = items.size >= (limit ?: Int.MAX_VALUE),
+                        )
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Exception fetching %s", title)
+                        HomeRowLoadingState.Error(title, null, ex)
+                    }
+                _state.update {
+                    it.copy(
+                        rows =
+                            it.rows.toMutableList().apply {
+                                set(watchHistoryIndex, result)
+                            },
+                    )
                 }
             }
         }
@@ -334,8 +387,13 @@ class RecommendedViewModel
             position: RowColumn,
             row: HomeRowLoadingState.Success,
         ) {
-            if (position.row in recommendedRows.indices) {
-                val recommendedRow = recommendedRows[position.row] as RecommendedRow<Any>
+            val recommendedRow =
+                when (position.row) {
+                    in recommendedRows.indices -> recommendedRows[position.row] as RecommendedRow<Any>
+                    watchHistoryIndex -> watchHistoryRow as? RecommendedRow<Any>
+                    else -> null // Suggestions
+                }
+            if (recommendedRow != null) {
                 val request = recommendedRow.request
                 val handler = recommendedRow.handler
                 if (request == null || handler == null) {
@@ -385,6 +443,7 @@ data class RecommendedRow<T>(
     val handler: RequestHandler<T>?,
     val request: T?,
     val dedupeBySeries: Boolean = false,
+    val dedupeByAlbum: Boolean = false,
     val combineContinueWatchingNextUp: Boolean = false,
 ) {
     companion object {
