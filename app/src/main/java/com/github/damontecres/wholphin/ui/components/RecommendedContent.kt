@@ -21,6 +21,7 @@ import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
+import com.github.damontecres.wholphin.services.LatestNextUpService
 import com.github.damontecres.wholphin.services.MediaManagementService
 import com.github.damontecres.wholphin.services.MediaReportService
 import com.github.damontecres.wholphin.services.MusicService
@@ -29,6 +30,7 @@ import com.github.damontecres.wholphin.services.SuggestionService
 import com.github.damontecres.wholphin.services.SuggestionsResource
 import com.github.damontecres.wholphin.services.UserPreferencesService
 import com.github.damontecres.wholphin.services.deleteItem
+import com.github.damontecres.wholphin.ui.DEFAULT_PAGE_SIZE
 import com.github.damontecres.wholphin.ui.OneTimeLaunchedEffect
 import com.github.damontecres.wholphin.ui.data.AddPlaylistViewModel
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
@@ -80,6 +82,7 @@ class RecommendedViewModel
         private val backdropService: BackdropService,
         private val mediaManagementService: MediaManagementService,
         private val suggestionService: SuggestionService,
+        private val latestNextUpService: LatestNextUpService,
         val mediaReportService: MediaReportService,
         @Assisted private val parentId: UUID,
         @Assisted private val suggestionsType: BaseItemKind,
@@ -124,7 +127,8 @@ class RecommendedViewModel
                                         title,
                                         items,
                                         viewOptions,
-                                        showViewMore = items.size >= limit,
+                                        // No single request backs a combined row, so there's no "view more" grid to show
+                                        showViewMore = !row.combineContinueWatchingNextUp && items.size >= limit,
                                     )
                                 } catch (ex: Exception) {
                                     Timber.e(ex, "Exception fetching %s", title)
@@ -155,21 +159,46 @@ class RecommendedViewModel
         private suspend fun <T> execute(
             row: RecommendedRow<T>,
             limit: Int?,
-        ): List<BaseItem?> =
-            if (limit != null) {
-                val request = row.handler.prepare(row.request, 0, limit, false)
+        ): List<BaseItem?> {
+            if (row.combineContinueWatchingNextUp) {
+                return fetchCombinedContinueWatchingNextUp(limit ?: DEFAULT_PAGE_SIZE)
+            }
+            return if (limit != null) {
+                val request = row.handler!!.prepare(row.request!!, 0, limit, false)
                 row.handler
                     .execute(api, request)
                     .toBaseItems(api, true)
             } else {
                 ApiRequestPager(
                     api,
-                    row.request,
-                    row.handler,
+                    row.request!!,
+                    row.handler!!,
                     viewModelScope,
                     useSeriesForPrimary = true,
                 ).init()
             }
+        }
+
+        /**
+         * Fetches Continue Watching and Next Up together as one merged, time-sorted list, scoped to
+         * this page's library. Mirrors the Home page's "combine Continue Watching & Next Up" row,
+         * reusing the same [LatestNextUpService] methods rather than duplicating the merge logic.
+         */
+        private suspend fun fetchCombinedContinueWatchingNextUp(limit: Int): List<BaseItem> {
+            val userId = serverRepository.currentUser?.id ?: return emptyList()
+            val prefs = userPreferencesService.getCurrent().appPreferences.homePagePreferences
+            val resume = latestNextUpService.getResume(userId, limit, true, parentId = parentId)
+            val nextUp =
+                latestNextUpService.getNextUp(
+                    userId,
+                    limit,
+                    prefs.enableRewatchingNextUp,
+                    false,
+                    prefs.maxDaysNextUp,
+                    parentId = parentId,
+                )
+            return latestNextUpService.buildCombined(resume, nextUp).take(limit)
+        }
 
         private fun fetchSuggestions() {
             viewModelScope.launch(WholphinDispatchers.IO) {
@@ -301,11 +330,17 @@ class RecommendedViewModel
         ) {
             if (position.row in recommendedRows.indices) {
                 val recommendedRow = recommendedRows[position.row] as RecommendedRow<Any>
+                val request = recommendedRow.request
+                val handler = recommendedRow.handler
+                if (request == null || handler == null) {
+                    // Combined rows aren't backed by a single request, so there's no grid to view more of
+                    return
+                }
                 navigationManager.navigateTo(
                     Destination.ItemGrid(
                         title = row.title,
-                        request = recommendedRow.request,
-                        requestHandler = recommendedRow.handler,
+                        request = request,
+                        requestHandler = handler,
                         initialPosition = row.items.size,
                         viewOptions =
                             ViewOptions(
@@ -341,9 +376,25 @@ data class RecommendedState(
 
 data class RecommendedRow<T>(
     val title: Int,
-    val handler: RequestHandler<T>,
-    val request: T,
-)
+    val handler: RequestHandler<T>?,
+    val request: T?,
+    val combineContinueWatchingNextUp: Boolean = false,
+) {
+    companion object {
+        /**
+         * A row combining Continue Watching & Next Up into one list, fetched by [RecommendedViewModel]
+         * directly instead of a single Jellyfin API request. Has no "view more" grid, since it isn't
+         * backed by one request/handler pair.
+         */
+        fun combinedContinueWatchingNextUp(): RecommendedRow<Unit> =
+            RecommendedRow(
+                title = R.string.continue_watching,
+                handler = null,
+                request = null,
+                combineContinueWatchingNextUp = true,
+            )
+    }
+}
 
 @Composable
 fun RecommendedContent(
