@@ -29,6 +29,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.UnavailabilityReason
+import com.github.damontecres.wholphin.data.model.unavailabilityReason
 import com.github.damontecres.wholphin.ui.AspectRatios
 import com.github.damontecres.wholphin.ui.Cards
 import com.github.damontecres.wholphin.ui.OneTimeLaunchedEffect
@@ -52,7 +54,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.tvShowsApi
-import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
 import timber.log.Timber
 import java.time.LocalDate
@@ -135,6 +136,7 @@ fun UpcomingEpisodeCard(
     modifier: Modifier = Modifier,
 ) {
     val unairedLabel = stringResource(R.string.unaired)
+    val missingLabel = stringResource(R.string.missing)
     BannerCard(
         name = item?.name,
         item = item,
@@ -142,10 +144,10 @@ fun UpcomingEpisodeCard(
         onLongClick = onLongClick,
         modifier = modifier,
         cornerText =
-            if (item?.data?.locationType == LocationType.VIRTUAL) {
-                unairedLabel
-            } else {
-                item?.data?.premiereDate?.let(::formatDateTime) ?: item?.ui?.episodeCornerText
+            when (item?.unavailabilityReason) {
+                UnavailabilityReason.MISSING -> missingLabel
+                UnavailabilityReason.UNAIRED -> unairedLabel
+                null -> item?.data?.premiereDate?.let(::formatDateTime) ?: item?.ui?.episodeCornerText
             },
         aspectRatio = item?.aspectRatio ?: AspectRatios.WIDE,
         cardHeight = Cards.heightEpisode,
@@ -210,6 +212,7 @@ fun UpcomingTvShow(
                             onLongClickItem = { _, _ -> },
                             cardContent = { _, item, mod, onClick, onLongClick ->
                                 val unairedLabel = stringResource(R.string.unaired)
+                                val missingLabel = stringResource(R.string.missing)
                                 SeasonCard(
                                     item = item,
                                     onClick = onClick,
@@ -219,7 +222,11 @@ fun UpcomingTvShow(
                                     imageHeight = Cards.height2x3,
                                     imageWidth = Dp.Unspecified,
                                     badgeText =
-                                        if (item?.data?.locationType == LocationType.VIRTUAL) unairedLabel else null,
+                                        when (item?.unavailabilityReason) {
+                                            UnavailabilityReason.MISSING -> missingLabel
+                                            UnavailabilityReason.UNAIRED -> unairedLabel
+                                            null -> null
+                                        },
                                 )
                             },
                             modifier =
