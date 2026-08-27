@@ -75,22 +75,27 @@ private fun getRecommendedRows(parentId: UUID) =
                     enableTotalRecordCount = false,
                 ),
         ),
-        RecommendedRow(
-            title = R.string.watch_history,
-            handler = GetItemsRequestHandler,
-            request =
-                GetItemsRequest(
-                    parentId = parentId,
-                    fields = SlimItemFields,
-                    includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM),
-                    recursive = true,
-                    enableUserData = true,
-                    isPlayed = true,
-                    sortBy = listOf(ItemSortBy.DATE_PLAYED),
-                    sortOrder = listOf(SortOrder.DESCENDING),
-                    enableTotalRecordCount = false,
-                ),
-        ),
+    )
+
+private fun watchHistoryRow(parentId: UUID) =
+    RecommendedRow(
+        title = R.string.watch_history,
+        handler = GetItemsRequestHandler,
+        request =
+            GetItemsRequest(
+                parentId = parentId,
+                fields = SlimItemFields,
+                // Individual played songs are collapsed down to their album below, since albums
+                // themselves aren't marked played until every song in them has been
+                includeItemTypes = listOf(BaseItemKind.AUDIO),
+                recursive = true,
+                enableUserData = true,
+                isPlayed = true,
+                sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                sortOrder = listOf(SortOrder.DESCENDING),
+                enableTotalRecordCount = false,
+            ),
+        dedupeByAlbum = true,
     )
 
 @Composable
@@ -112,6 +117,7 @@ fun RecommendedMusic(
                             heightDp = Cards.HEIGHT_EPISODE,
                             showTitles = true,
                         ),
+                    watchHistoryRow = watchHistoryRow(parentId),
                 )
             },
         ),

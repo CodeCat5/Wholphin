@@ -7,6 +7,7 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomePageSettings
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
+import com.github.damontecres.wholphin.data.model.dedupeAudioByAlbum
 import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
 import com.github.damontecres.wholphin.data.model.SUPPORTED_HOME_PAGE_SETTINGS_VERSION
 import com.github.damontecres.wholphin.data.model.createGenreDestination
@@ -666,7 +667,15 @@ class HomeSettingsService
                             userId = userDto.id,
                             fields = HomeItemFields,
                             recursive = true,
-                            limit = limit,
+                            // Fetch extra raw items since multiple songs from the same album
+                            // collapse into a single entry below
+                            limit = limit * 4,
+                            includeItemTypes =
+                                listOf(
+                                    BaseItemKind.MOVIE,
+                                    BaseItemKind.EPISODE,
+                                    BaseItemKind.AUDIO,
+                                ),
                             isPlayed = true,
                             sortBy = listOf(ItemSortBy.DATE_PLAYED),
                             sortOrder = listOf(SortOrder.DESCENDING),
@@ -684,6 +693,8 @@ class HomeSettingsService
                             .execute(api, request)
                             .content.items
                             .map { BaseItem(it, row.viewOptions.useSeries) }
+                            .dedupeAudioByAlbum()
+                            .take(limit)
                     }.let {
                         Success(
                             title,
