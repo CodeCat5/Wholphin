@@ -30,7 +30,9 @@ import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.extensions.ticks
+import java.time.LocalDateTime
 import java.util.Locale
 import java.util.UUID
 import kotlin.time.Duration
@@ -383,3 +385,16 @@ fun createStudioDestination(
 )
 
 val BaseItem.studioNames get() = data.studios?.mapNotNull { it.name }.orEmpty()
+
+enum class UnavailabilityReason { UNAIRED, MISSING }
+
+val BaseItem.unavailabilityReason: UnavailabilityReason?
+    get() {
+        if (data.locationType != LocationType.VIRTUAL) return null
+        val premiereDate = data.premiereDate ?: return UnavailabilityReason.UNAIRED
+        return if (premiereDate.isBefore(LocalDateTime.now())) {
+            UnavailabilityReason.MISSING
+        } else {
+            UnavailabilityReason.UNAIRED
+        }
+    }

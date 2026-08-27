@@ -20,7 +20,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.UnavailabilityReason
 import com.github.damontecres.wholphin.data.model.studioNames
+import com.github.damontecres.wholphin.data.model.unavailabilityReason
 import com.github.damontecres.wholphin.ui.components.ScrollableDialog
 import com.github.damontecres.wholphin.ui.formatBitrate
 import com.github.damontecres.wholphin.ui.formatBytes
@@ -32,7 +34,6 @@ import com.github.damontecres.wholphin.ui.letNotEmpty
 import com.github.damontecres.wholphin.ui.util.StreamFormatting.formatAudioCodec
 import com.github.damontecres.wholphin.ui.util.StreamFormatting.formatSubtitleCodec
 import com.github.damontecres.wholphin.util.languageName
-import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.MediaStream
 import org.jellyfin.sdk.model.api.MediaStreamType
@@ -50,6 +51,7 @@ data class ItemDetailsDialogInfo(
     val studios: List<String> = emptyList(),
     val lastPlayed: LocalDateTime? = null,
     val unaired: Boolean = false,
+    val missing: Boolean = false,
     val premiereDate: LocalDateTime? = null,
 ) {
     constructor(item: BaseItem) : this(
@@ -59,7 +61,8 @@ data class ItemDetailsDialogInfo(
         files = item.data.mediaSources.orEmpty(),
         studios = item.studioNames,
         lastPlayed = item.data.userData?.lastPlayedDate,
-        unaired = item.data.locationType == LocationType.VIRTUAL,
+        unaired = item.unavailabilityReason != null,
+        missing = item.unavailabilityReason == UnavailabilityReason.MISSING,
         premiereDate = item.data.premiereDate,
     )
 }
@@ -85,6 +88,7 @@ fun ItemDetailsDialog(
     val runtimeLabel = stringResource(R.string.runtime_sort)
     val lastPlayedLabel = stringResource(R.string.last_played)
     val unairedLabel = stringResource(R.string.unaired)
+    val missingLabel = stringResource(R.string.missing)
 
     ScrollableDialog(
         onDismissRequest = onDismissRequest,
@@ -99,9 +103,10 @@ fun ItemDetailsDialog(
                     style = MaterialTheme.typography.headlineSmall,
                 )
                 if (info.unaired) {
+                    val label = if (info.missing) missingLabel else unairedLabel
                     val airDate = remember(info.premiereDate) { info.premiereDate?.let { formatDateTime(it) } }
                     Text(
-                        text = if (airDate != null) "$unairedLabel • $airDate" else unairedLabel,
+                        text = if (airDate != null) "$label • $airDate" else label,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
