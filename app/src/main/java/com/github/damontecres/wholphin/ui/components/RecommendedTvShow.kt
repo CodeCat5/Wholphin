@@ -79,6 +79,22 @@ private fun getRecommendedRows(parentId: UUID) =
                     enableTotalRecordCount = false,
                 ),
         ),
+        RecommendedRow(
+            title = R.string.watch_history,
+            handler = GetItemsRequestHandler,
+            request =
+                GetItemsRequest(
+                    parentId = parentId,
+                    fields = SlimItemFields,
+                    includeItemTypes = listOf(BaseItemKind.EPISODE),
+                    recursive = true,
+                    enableUserData = true,
+                    isPlayed = true,
+                    sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                    sortOrder = listOf(SortOrder.DESCENDING),
+                    enableTotalRecordCount = false,
+                ),
+        ),
     )
 
 /**

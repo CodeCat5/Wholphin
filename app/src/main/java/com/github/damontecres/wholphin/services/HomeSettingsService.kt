@@ -456,6 +456,14 @@ class HomeSettingsService
                     )
                 }
 
+                is HomeRowConfig.WatchHistory -> {
+                    HomeRowConfigDisplay(
+                        id,
+                        ResStringProvider(R.string.watch_history),
+                        config,
+                    )
+                }
+
                 is HomeRowConfig.Genres -> {
                     val title = getItemName(R.string.genres_in, config.parentId)
                     HomeRowConfigDisplay(
@@ -649,6 +657,42 @@ class HomeSettingsService
                         rowType = row,
                         showViewMore = combined.size >= limit,
                     )
+                }
+
+                is HomeRowConfig.WatchHistory -> {
+                    val title = ResStringProvider(R.string.watch_history)
+                    val request =
+                        GetItemsRequest(
+                            userId = userDto.id,
+                            fields = HomeItemFields,
+                            recursive = true,
+                            limit = limit,
+                            isPlayed = true,
+                            sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                            sortOrder = listOf(SortOrder.DESCENDING),
+                        )
+                    if (usePaging) {
+                        ApiRequestPager(
+                            api,
+                            request,
+                            GetItemsRequestHandler,
+                            scope,
+                            useSeriesForPrimary = row.viewOptions.useSeries,
+                        ).init()
+                    } else {
+                        GetItemsRequestHandler
+                            .execute(api, request)
+                            .content.items
+                            .map { BaseItem(it, row.viewOptions.useSeries) }
+                    }.let {
+                        Success(
+                            title,
+                            it,
+                            row.viewOptions,
+                            rowType = row,
+                            showViewMore = it.size >= limit,
+                        )
+                    }
                 }
 
                 is HomeRowConfig.Genres -> {

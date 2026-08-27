@@ -167,6 +167,7 @@
     <string name="video">Video</string>
     <string name="videos">Videos</string>
     <string name="watch_live">Watch live</string>g
+    <string name="watch_history">Watch History</string>
     <plurals name="years_old">
         <item quantity="zero">%1$d years old</item>
         <item quantity="one">%1$d year old</item>
