@@ -54,10 +54,12 @@ class LatestNextUpService
             limit: Int,
             includeEpisodes: Boolean,
             useSeriesForPrimary: Boolean = true,
+            parentId: UUID? = null,
         ): List<BaseItem> {
             val request =
                 GetResumeItemsRequest(
                     userId = userId,
+                    parentId = parentId,
                     fields = SlimItemFields,
                     limit = limit,
                     mediaTypes = listOf(MediaType.VIDEO),
@@ -83,6 +85,7 @@ class LatestNextUpService
             enableResumable: Boolean,
             maxDays: Int,
             useSeriesForPrimary: Boolean = true,
+            parentId: UUID? = null,
         ): List<BaseItem> {
             val removedSeries = getRemovedFromNextUp(userId)
             val nextUpDateCutoff =
@@ -92,7 +95,7 @@ class LatestNextUpService
                     userId = userId,
                     fields = SlimItemFields,
                     imageTypeLimit = 1,
-                    parentId = null,
+                    parentId = parentId,
                     limit = limit,
                     enableResumable = enableResumable,
                     enableUserData = true,
