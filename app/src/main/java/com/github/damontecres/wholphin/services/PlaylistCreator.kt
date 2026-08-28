@@ -166,6 +166,7 @@ class PlaylistCreator
                 BaseItemKind.BOX_SET,
                 BaseItemKind.COLLECTION_FOLDER,
                 BaseItemKind.USER_VIEW,
+                BaseItemKind.FOLDER,
                 -> {
                     PlaylistCreationResult.Success(
                         createFromCollection(
@@ -311,7 +312,6 @@ class PlaylistCreator
 
                 // Not support yet
 //                BaseItemKind.AGGREGATE_FOLDER -> TODO()
-//                BaseItemKind.FOLDER -> TODO()
 //                BaseItemKind.GENRE -> TODO()
 //                BaseItemKind.MANUAL_PLAYLISTS_FOLDER -> TODO()
 //                BaseItemKind.MUSIC_ALBUM -> TODO()

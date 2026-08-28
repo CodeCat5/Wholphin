@@ -114,7 +114,7 @@ fun CollectionFolderTv(
                         showHeader = position < columns
                     },
                     onClickItem = onClickItem,
-                    playEnabled = false,
+                    playEnabled = true,
                     focusRequesterOnEmpty = tabDetails.tabFocusRequester,
                 )
             }

@@ -16,7 +16,10 @@ import com.github.damontecres.wholphin.ui.components.CollectionFolderView
 import com.github.damontecres.wholphin.ui.components.ViewOptionsPoster
 import com.github.damontecres.wholphin.ui.components.ViewOptionsWide
 import com.github.damontecres.wholphin.ui.data.VideoSortOptions
+import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.preferences.PreferencesViewModel
+import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ItemSortBy
 import java.util.UUID
 
@@ -31,6 +34,7 @@ fun CollectionFolderGeneric(
     filter: CollectionFolderFilter = CollectionFolderFilter(),
     filterOptions: List<ItemFilterBy<*>> = DefaultFilterOptions,
     sortOptions: List<ItemSortBy> = VideoSortOptions,
+    collectionType: CollectionType? = null,
     preferencesViewModel: PreferencesViewModel = hiltViewModel(),
 ) {
     var showHeader by rememberSaveable { mutableStateOf(true) }
@@ -45,7 +49,15 @@ fun CollectionFolderGeneric(
     CollectionFolderView(
         preferences = preferences,
         onClickItem = { index, item ->
-            preferencesViewModel.navigationManager.navigateTo(item.destination(index))
+            val destination =
+                if (item.type == BaseItemKind.FOLDER) {
+                    // Subfolders don't carry their own collectionType, so the ambient one is
+                    // passed along explicitly to keep Play/Shuffle working at every nesting level
+                    Destination.MediaItem(item.id, item.type, collectionType)
+                } else {
+                    item.destination(index)
+                }
+            preferencesViewModel.navigationManager.navigateTo(destination)
         },
         itemId = itemId,
         initialFilter = filter,
