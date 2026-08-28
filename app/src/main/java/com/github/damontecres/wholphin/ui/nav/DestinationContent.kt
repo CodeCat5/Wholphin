@@ -465,6 +465,7 @@ fun CollectionFolder(
                 playEnabled = false,
                 modifier = modifier,
                 sortOptions = MovieSortOptions,
+                collectionType = collectionType,
             )
         }
 
@@ -514,6 +515,7 @@ fun CollectionFolder(
                 recursive = recursiveOverride ?: false,
                 playEnabled = true,
                 modifier = modifier,
+                collectionType = collectionType,
             )
         }
 
@@ -529,6 +531,7 @@ fun CollectionFolder(
                 recursive = recursiveOverride ?: false,
                 playEnabled = false,
                 modifier = modifier,
+                collectionType = collectionType,
             )
         }
     }
