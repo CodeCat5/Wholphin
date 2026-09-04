@@ -44,6 +44,7 @@ import com.github.damontecres.wholphin.preferences.enabled
 import com.github.damontecres.wholphin.services.DatePlayedService
 import com.github.damontecres.wholphin.services.DeviceProfileService
 import com.github.damontecres.wholphin.services.ImageUrlService
+import com.github.damontecres.wholphin.services.LatestNextUpService
 import com.github.damontecres.wholphin.services.MusicService
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.PlayerFactory
@@ -81,6 +82,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -144,6 +146,7 @@ class PlaybackViewModel
         internal val itemPlaybackRepository: ItemPlaybackRepository,
         private val playerFactory: PlayerFactory,
         private val datePlayedService: DatePlayedService,
+        private val latestNextUpService: LatestNextUpService,
         private val deviceInfo: DeviceInfo,
         private val deviceProfileService: DeviceProfileService,
         private val refreshRateService: RefreshRateService,
@@ -1088,7 +1091,8 @@ class PlaybackViewModel
 
                                 prefs.showNextUpWhen != ShowNextUpWhen.NEXT_UP_NEVER -> {
                                     Timber.v("Setting next up to ${nextItem.id}")
-                                    _state.update { it.copy(nextUp = nextItem.item) }
+                                    _state.update { it.copy(nextUp = nextItem.item, justPlayed = currentItem.item) }
+                                    fetchOnDeck(currentItem.id, nextItem.id)
                                 }
 
                                 else -> {
@@ -1166,7 +1170,10 @@ class PlaybackViewModel
                                     val nextItem = state.nextItem()
                                     if (nextItem is PlaylistItem.Media) {
                                         Timber.v("Setting next up during outro to ${nextItem?.id}")
-                                        _state.update { it.copy(nextUp = nextItem.item) }
+                                        _state.update {
+                                            it.copy(nextUp = nextItem.item, justPlayed = currentItem.item)
+                                        }
+                                        fetchOnDeck(currentItem.id, nextItem.id)
                                     }
                                 } else {
                                     val behavior =
@@ -1332,7 +1339,38 @@ class PlaybackViewModel
         }
 
         suspend fun cancelUpNextEpisode() {
-            _state.update { it.copy(nextUp = null) }
+            _state.update { it.copy(nextUp = null, justPlayed = null, onDeck = emptyList()) }
+        }
+
+        /**
+         * Fetches a combined Continue Watching + Next Up list across the whole library to show
+         * as an "On Deck" row alongside the Next Up card, excluding whatever is already shown as
+         * the just-played or next-up item so the row doesn't repeat them.
+         */
+        private fun fetchOnDeck(
+            vararg excludeIds: UUID,
+        ) {
+            val userId = serverRepository.currentUser?.id ?: return
+            viewModelScope.launchIO {
+                val prefs = preferences.appPreferences.homePagePreferences
+                val limit = prefs.maxItemsPerRow
+                val resume = async { latestNextUpService.getResume(userId, limit, true) }
+                val nextUp =
+                    async {
+                        latestNextUpService.getNextUp(
+                            userId,
+                            limit,
+                            prefs.enableRewatchingNextUp,
+                            false,
+                            prefs.maxDaysNextUp,
+                        )
+                    }
+                val combined =
+                    latestNextUpService
+                        .buildCombined(resume.await(), nextUp.await())
+                        .filterNot { it.id in excludeIds }
+                _state.update { it.copy(onDeck = combined) }
+            }
         }
 
         fun playItemInPlaylist(item: BaseItem) {

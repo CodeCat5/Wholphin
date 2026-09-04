@@ -22,6 +22,8 @@ data class PlaybackState(
     val analyticsState: AnalyticsState = AnalyticsState(),
     val subtitleCues: List<Cue> = emptyList(),
     val nextUp: BaseItem? = null,
+    val justPlayed: BaseItem? = null,
+    val onDeck: List<BaseItem> = emptyList(),
     val playlistIndex: Int = 0,
     val playlist: Playlist = Playlist(emptyList()),
 ) {

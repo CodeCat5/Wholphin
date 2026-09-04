@@ -1,7 +1,9 @@
 package com.github.damontecres.wholphin.ui.playback
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -46,12 +50,15 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePreviewHandler
 import coil3.compose.LocalAsyncImagePreviewHandler
 import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.ui.AppColors
 import com.github.damontecres.wholphin.ui.AspectRatios
 import com.github.damontecres.wholphin.ui.PreviewTvSpec
+import com.github.damontecres.wholphin.ui.cards.SeasonCard
 import com.github.damontecres.wholphin.ui.dot
 import com.github.damontecres.wholphin.ui.formatDuration
 import com.github.damontecres.wholphin.ui.formatTime
+import com.github.damontecres.wholphin.ui.ifElse
 import com.github.damontecres.wholphin.ui.theme.WholphinTheme
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.ui.util.Clock
@@ -74,8 +81,15 @@ fun NextUpEpisode(
     modifier: Modifier = Modifier,
     aspectRatio: Float = AspectRatios.WIDE,
     runtime: Duration? = null,
+    justPlayed: BaseItem? = null,
+    onClickJustPlayed: () -> Unit = {},
+    onDeck: List<BaseItem> = emptyList(),
+    onClickOnDeckItem: (BaseItem) -> Unit = {},
+    onUpNextFocusChanged: (Boolean) -> Unit = {},
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val isUpNextFocused = interactionSource.collectIsFocusedAsState().value
+    LaunchedEffect(isUpNextFocused) { onUpNextFocusChanged(isUpNextFocused) }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.tryRequestFocus() }
     Box(
@@ -86,7 +100,9 @@ fun NextUpEpisode(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .focusGroup()
+                    .focusRestorer(focusRequester),
         ) {
             Text(
                 text = stringResource(R.string.next_up) + "...",
@@ -96,10 +112,22 @@ fun NextUpEpisode(
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(
-                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(8.dp),
+                modifier =
+                    Modifier
+                        .padding(8.dp)
+                        .ifElse(onDeck.isNotEmpty(), Modifier.height(140.dp)),
             ) {
+                if (justPlayed != null) {
+                    SeasonCard(
+                        item = justPlayed,
+                        onClick = onClickJustPlayed,
+                        onLongClick = {},
+                        imageHeight = 90.dp,
+                        showImageOverlay = true,
+                    )
+                }
                 NextUpCard(
                     imageUrl = imageUrl,
                     onClick = onClick,
@@ -163,6 +191,12 @@ fun NextUpEpisode(
                         )
                     }
                 }
+            }
+            if (onDeck.isNotEmpty()) {
+                OnDeckRow(
+                    items = onDeck,
+                    onClickItem = onClickOnDeckItem,
+                )
             }
         }
     }

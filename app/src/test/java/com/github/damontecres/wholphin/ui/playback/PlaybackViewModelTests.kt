@@ -20,6 +20,7 @@ import com.github.damontecres.wholphin.preferences.updatePlaybackPreferences
 import com.github.damontecres.wholphin.services.DatePlayedService
 import com.github.damontecres.wholphin.services.DeviceProfileService
 import com.github.damontecres.wholphin.services.ImageUrlService
+import com.github.damontecres.wholphin.services.LatestNextUpService
 import com.github.damontecres.wholphin.services.MusicService
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.PlayerCreation
@@ -95,6 +96,7 @@ class PlaybackViewModelTests {
     private val mockItemPlaybackRepository = mockk<ItemPlaybackRepository>(relaxed = true)
     private val mockPlayerFactory = mockk<PlayerFactory>()
     private val mockDatePlayedService = mockk<DatePlayedService>(relaxed = true)
+    private val mockLatestNextUpService = mockk<LatestNextUpService>(relaxed = true)
     private val mockDeviceInfo = mockk<DeviceInfo>(relaxed = true)
     private val mockDeviceProfileService = mockk<DeviceProfileService>(relaxed = true)
     private val mockRefreshRateService = mockk<RefreshRateService>(relaxed = true)
@@ -121,6 +123,7 @@ class PlaybackViewModelTests {
             itemPlaybackRepository = mockItemPlaybackRepository,
             playerFactory = mockPlayerFactory,
             datePlayedService = mockDatePlayedService,
+            latestNextUpService = mockLatestNextUpService,
             deviceInfo = mockDeviceInfo,
             deviceProfileService = mockDeviceProfileService,
             refreshRateService = mockRefreshRateService,

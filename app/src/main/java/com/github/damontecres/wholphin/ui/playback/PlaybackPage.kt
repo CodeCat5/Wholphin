@@ -335,7 +335,15 @@ fun PlaybackPageContent(
         modifier
             .background(if (state.nextUp == null) Color.Black else MaterialTheme.colorScheme.background),
     ) {
-        val playerSize by animateFloatAsState(if (state.nextUp == null) 1f else .6f)
+        val playerSize by
+            animateFloatAsState(
+                when {
+                    state.nextUp == null -> 1f
+                    // Leave extra room for the Just Played card + On Deck row below it
+                    state.onDeck.isNotEmpty() -> .32f
+                    else -> .6f
+                },
+            )
         Box(
             modifier =
                 Modifier
@@ -635,6 +643,7 @@ fun PlaybackPageContent(
                         preferences.appPreferences.playbackPreferences.autoPlayNextDelaySeconds,
                     )
                 }
+                var upNextHasBeenFocused by remember { mutableStateOf(false) }
                 BackHandler(timeLeft > 0 && autoPlayEnabled) {
                     timeLeft = -1
                     autoPlayEnabled = false
@@ -670,6 +679,26 @@ fun PlaybackPageContent(
                     },
                     timeLeft = if (autoPlayEnabled) timeLeft.seconds else null,
                     runtime = it.data.runTimeTicks?.ticks,
+                    justPlayed = state.justPlayed,
+                    onClickJustPlayed = {
+                        state.justPlayed?.let { justPlayed ->
+                            viewModel.navigationManager.navigateTo(Destination.Playback(justPlayed.id, 0L))
+                        }
+                    },
+                    onDeck = state.onDeck,
+                    onClickOnDeckItem = { item ->
+                        viewModel.navigationManager.navigateTo(Destination.Playback(item))
+                    },
+                    onUpNextFocusChanged = { focused ->
+                        if (focused) {
+                            upNextHasBeenFocused = true
+                        } else if (upNextHasBeenFocused) {
+                            // Moving focus away from the Up Next card means the user wants to
+                            // browse instead of auto-advance, so stop the countdown
+                            timeLeft = -1
+                            autoPlayEnabled = false
+                        }
+                    },
                     modifier =
                         Modifier
                             .padding(8.dp)
