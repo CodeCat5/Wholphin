@@ -60,6 +60,7 @@ enum class PlaybackDialogType {
     PLAYBACK_SPEED,
     VIDEO_SCALE,
     SUBTITLE_DELAY,
+    QUALITY,
 }
 
 data class PlaybackSettings(
@@ -73,6 +74,7 @@ data class PlaybackSettings(
     val subtitleDelay: Duration,
     val hasSubtitleDownloadPermission: Boolean,
     val playbackSpeedEnabled: Boolean,
+    val maxBitrateOverride: Long? = null,
 )
 
 /**
@@ -164,6 +166,13 @@ fun PlaybackDialog(
                     }
                     add(
                         BottomDialogItem(
+                            data = PlaybackDialogType.QUALITY,
+                            headline = stringResource(R.string.quality),
+                            supporting = qualityLabel(settings.maxBitrateOverride),
+                        ),
+                    )
+                    add(
+                        BottomDialogItem(
                             data = PlaybackDialogType.DEBUG,
                             headline = stringResource(if (settings.showDebugInfo) R.string.hide_debug_info else R.string.show_debug_info),
                             supporting = null,
@@ -241,6 +250,20 @@ fun PlaybackDialog(
                 },
                 onSelectChoice = { _, choice ->
                     onPlaybackActionClick.invoke(PlaybackAction.Scale(choice.data))
+                },
+                gravity = leftGravity,
+            )
+        }
+
+        PlaybackDialogType.QUALITY -> {
+            QualityBottomDialog(
+                currentChoice = settings.maxBitrateOverride,
+                onDismissRequest = {
+                    onControllerInteraction.invoke()
+                    onDismissRequest.invoke()
+                },
+                onSelectChoice = { bitrate ->
+                    onPlaybackActionClick.invoke(PlaybackAction.MaxBitrate(bitrate))
                 },
                 gravity = leftGravity,
             )

@@ -26,6 +26,7 @@ data class PlaybackState(
     val onDeck: List<BaseItem> = emptyList(),
     val playlistIndex: Int = 0,
     val playlist: Playlist = Playlist(emptyList()),
+    val maxBitrateOverride: Long? = null,
 ) {
     val hasNext: Boolean get() = (playlistIndex + 1) < playlist.items.size
     val hasPrevious: Boolean get() = playlistIndex > 0
