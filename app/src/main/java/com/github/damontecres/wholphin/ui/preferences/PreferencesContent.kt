@@ -51,6 +51,7 @@ import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.AppSwitchPreference
 import com.github.damontecres.wholphin.preferences.ExoPlayerPreferences
 import com.github.damontecres.wholphin.preferences.ExperimentalPreference
+import com.github.damontecres.wholphin.preferences.HdrFormatPreferences
 import com.github.damontecres.wholphin.preferences.MpvPreferences
 import com.github.damontecres.wholphin.preferences.PlayerBackend
 import com.github.damontecres.wholphin.preferences.ScreensaverPreference
@@ -58,6 +59,7 @@ import com.github.damontecres.wholphin.preferences.SkipSegmentPreferences
 import com.github.damontecres.wholphin.preferences.advancedPreferences
 import com.github.damontecres.wholphin.preferences.basicPreferences
 import com.github.damontecres.wholphin.preferences.experimentalPreferences
+import com.github.damontecres.wholphin.preferences.lazyListWrapScrolling
 import com.github.damontecres.wholphin.preferences.screensaverPreferences
 import com.github.damontecres.wholphin.preferences.updatePlaybackPreferences
 import com.github.damontecres.wholphin.services.Release
@@ -99,6 +101,9 @@ fun PreferencesContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
+    val firstFocusRequester = remember { FocusRequester() }
+    val lastFocusRequester = remember { FocusRequester() }
+
     var focusedIndex by rememberSaveable { mutableStateOf(Pair(0, 0)) }
     val state = rememberLazyListState()
     var preferences by remember { mutableStateOf(initialPreferences) }
@@ -135,7 +140,7 @@ fun PreferencesContent(
         }
     }
 
-    val movementSounds = true
+    val movementSounds = false
     val installedVersion = updateVM.currentVersion
     val updateAvailable =
         remember(updateState.release) {
@@ -151,6 +156,7 @@ fun PreferencesContent(
             PreferenceScreenOption.SCREENSAVER -> screensaverPreferences
             PreferenceScreenOption.SKIP_SEGMENTS -> SkipSegmentPreferences
             PreferenceScreenOption.EXPERIMENTAL -> experimentalPreferences
+            PreferenceScreenOption.HDR_FORMATS -> HdrFormatPreferences
         }
     val screenTitle =
         when (preferenceScreenOption) {
@@ -161,6 +167,7 @@ fun PreferencesContent(
             PreferenceScreenOption.SCREENSAVER -> R.string.screensaver_settings
             PreferenceScreenOption.SKIP_SEGMENTS -> R.string.skip_behavior
             PreferenceScreenOption.EXPERIMENTAL -> R.string.experimental_settings
+            PreferenceScreenOption.HDR_FORMATS -> R.string.hdr_formats
         }
 
     var visible by remember { mutableStateOf(false) }
@@ -184,6 +191,12 @@ fun PreferencesContent(
             }
         }
     }
+
+    val showUpdate =
+        UpdateChecker.ACTIVE &&
+            preferenceScreenOption == PreferenceScreenOption.BASIC &&
+            preferences.autoCheckForUpdates &&
+            updateAvailable
 
     AnimatedVisibility(
         visible = visible,
@@ -214,12 +227,10 @@ fun PreferencesContent(
                 contentPadding = PaddingValues(16.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                if (UpdateChecker.ACTIVE &&
-                    preferenceScreenOption == PreferenceScreenOption.BASIC &&
-                    preferences.autoCheckForUpdates &&
-                    updateAvailable
-                ) {
+                if (showUpdate) {
                     item {
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val focused = interactionSource.collectIsFocusedAsState().value
                         val updateFocusRequester = remember { FocusRequester() }
                         LaunchedEffect(Unit) {
                             if (focusedIndex.first == 0 && focusedIndex.second == 0) {
@@ -234,10 +245,20 @@ fun PreferencesContent(
                                 viewModel.navigationManager.navigateTo(Destination.UpdateApp)
                             },
                             summary = release?.version?.toString(),
+                            interactionSource = interactionSource,
                             modifier =
                                 Modifier
                                     .focusRequester(updateFocusRequester)
-                                    .playSoundOnFocus(movementSounds),
+                                    .focusRequester(firstFocusRequester)
+                                    .playSoundOnFocus(movementSounds)
+                                    .lazyListWrapScrolling(
+                                        state = state,
+                                        focused = focused,
+                                        isFirst = true,
+                                        isLast = false,
+                                        firstFocusRequester = firstFocusRequester,
+                                        lastFocusRequester = lastFocusRequester,
+                                    ),
                         )
                     }
                 }
@@ -262,15 +283,25 @@ fun PreferencesContent(
                                 .flatten()
                     groupPreferences.forEachIndexed { prefIndex, pref ->
                         pref as AppPreference<AppPreferences, Any>
+                        val isFirst = groupIndex == 0 && prefIndex == 0 && !showUpdate
+                        val isLast =
+                            groupIndex == prefList.lastIndex && prefIndex == groupPreferences.lastIndex
                         item {
                             val interactionSource = remember { MutableInteractionSource() }
+                            val focused = interactionSource.collectIsFocusedAsState().value
                             val focusModifier =
                                 Modifier
                                     .ifElse(
                                         groupIndex == focusedIndex.first && prefIndex == focusedIndex.second,
                                         Modifier.focusRequester(focusRequester),
+                                    ).lazyListWrapScrolling(
+                                        state,
+                                        focused,
+                                        isFirst,
+                                        isLast,
+                                        firstFocusRequester,
+                                        lastFocusRequester,
                                     )
-                            val focused = interactionSource.collectIsFocusedAsState().value
                             LaunchedEffect(focused) {
                                 if (focused) {
                                     focusedIndex = Pair(groupIndex, prefIndex)
@@ -807,6 +838,7 @@ fun PreferencesPage(
             PreferenceScreenOption.SCREENSAVER,
             PreferenceScreenOption.SKIP_SEGMENTS,
             PreferenceScreenOption.EXPERIMENTAL,
+            PreferenceScreenOption.HDR_FORMATS,
             -> {
                 PreferencesContent(
                     initialPreferences,

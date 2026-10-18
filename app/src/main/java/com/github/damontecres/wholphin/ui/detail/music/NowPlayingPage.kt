@@ -45,11 +45,10 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.state.rememberCurrentMediaItemState
 import androidx.tv.material3.Button
@@ -106,11 +105,9 @@ fun NowPlayingPage(
             ).value.appPreferences
     val musicPrefs = preferences.musicPreferences
 
-    val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val keyHandler =
-        remember(isLtr, preferences) {
+        remember(preferences) {
             PlaybackKeyHandler(
-                isLtr = isLtr,
                 player = player,
                 controlsEnabled = true,
                 skipWithLeftRight = false,
@@ -131,6 +128,12 @@ fun NowPlayingPage(
                 onPlaybackDialogTypeClick = { },
                 getDurationMs = { player.duration },
                 dpadSeekMode = preferences.playbackPreferences.dpadSeekMode,
+                onSeekToNext = {
+                    if (player.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT)) player.seekToNext()
+                },
+                onPSeekToPrevious = {
+                    if (player.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS)) player.seekToPrevious()
+                },
             )
         }
 
