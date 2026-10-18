@@ -4,6 +4,7 @@ import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
 import com.github.damontecres.wholphin.data.model.HomeRowViewOptions
 import com.github.damontecres.wholphin.ui.util.StringProvider
+import java.util.UUID
 
 /**
  * Generic state for loading something from the API
@@ -68,6 +69,7 @@ sealed interface HomeRowLoadingState {
         val viewOptions: HomeRowViewOptions = HomeRowViewOptions(),
         val rowType: HomeRowConfig? = null,
         val showViewMore: Boolean = true,
+        val seriesUnplayedCounts: Map<UUID, Int> = emptyMap(),
     ) : HomeRowLoadingState
 
     data class Error(

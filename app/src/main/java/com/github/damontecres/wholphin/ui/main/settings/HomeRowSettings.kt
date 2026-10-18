@@ -308,6 +308,14 @@ internal object Options {
             setter = { vo, value -> vo.copy(showTitles = value) },
         )
 
+    val ViewOptionsShowUnplayedCount =
+        AppSwitchPreference<HomeRowViewOptions>(
+            title = R.string.show_unplayed_count,
+            defaultValue = false,
+            getter = { it.showUnplayedCount },
+            setter = { vo, value -> vo.copy(showUnplayedCount = value) },
+        )
+
     val ViewOptionsUseSeries =
         AppSwitchPreference<HomeRowViewOptions>(
             title = R.string.use_series,
@@ -398,6 +406,7 @@ internal object Options {
                         ViewOptionsCardHeight,
                         ViewOptionsSpacing,
                         ViewOptionsShowTitles,
+                        ViewOptionsShowUnplayedCount,
                         ViewOptionsImageType,
                         ViewOptionsAspectRatio,
                         ViewOptionsContentScale,
@@ -424,6 +433,7 @@ internal object Options {
                         ViewOptionsCardHeight,
                         ViewOptionsSpacing,
                         ViewOptionsShowTitles,
+                        ViewOptionsShowUnplayedCount,
                         ViewOptionsImageType,
                         ViewOptionsAspectRatio,
                         ViewOptionsContentScale,

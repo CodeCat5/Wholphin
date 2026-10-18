@@ -621,6 +621,7 @@ class HomeSettingsService
                         viewOptions = row.viewOptions,
                         rowType = row,
                         showViewMore = resume.size >= limit,
+                        seriesUnplayedCounts = fetchSeriesUnplayedCounts(api, row.viewOptions, userDto.id, resume),
                     )
                 }
 
@@ -641,6 +642,7 @@ class HomeSettingsService
                         viewOptions = row.viewOptions,
                         rowType = row,
                         showViewMore = nextUp.size >= limit,
+                        seriesUnplayedCounts = fetchSeriesUnplayedCounts(api, row.viewOptions, userDto.id, nextUp),
                     )
                 }
 
@@ -669,6 +671,7 @@ class HomeSettingsService
                         viewOptions = row.viewOptions,
                         rowType = row,
                         showViewMore = combined.size >= limit,
+                        seriesUnplayedCounts = fetchSeriesUnplayedCounts(api, row.viewOptions, userDto.id, combined.take(limit)),
                     )
                 }
 
@@ -858,6 +861,7 @@ class HomeSettingsService
                                     row.viewOptions,
                                     rowType = row,
                                     showViewMore = it.size >= limit,
+                                    seriesUnplayedCounts = fetchSeriesUnplayedCounts(api, row.viewOptions, userDto.id, it),
                                 )
                             }
                     latest

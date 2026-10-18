@@ -463,6 +463,7 @@
     <string name="bit_unit">bit</string>
     <string name="sample_rate_unit">Hz</string>
     <string name="show_titles">Show titles</string>
+    <string name="show_unplayed_count">Show unplayed count</string>
     <string name="live_tv_repeat">Repeat</string>
     <string name="favorite_channels_at_beginning">Show favorite channels first</string>
     <string name="sort_channels_recently_watched">Sort channels by recently watched</string>
