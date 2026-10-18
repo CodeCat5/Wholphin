@@ -63,15 +63,13 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.surfaceColorAtElevation
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.TrackIndex
+import com.github.damontecres.wholphin.preferences.lazyListWrapScrolling
+import com.github.damontecres.wholphin.services.StreamChoiceResult
 import com.github.damontecres.wholphin.ui.FontAwesome
 import com.github.damontecres.wholphin.ui.formatBitrate
-import com.github.damontecres.wholphin.ui.ifElse
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.playback.SimpleMediaStream
-import com.github.damontecres.wholphin.ui.playback.isDown
-import com.github.damontecres.wholphin.ui.playback.isUp
 import com.github.damontecres.wholphin.ui.roundMinutes
-import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -322,30 +320,13 @@ fun DialogPopupContent(
                             modifier =
                                 Modifier
                                     .focusRequester(focusRequesters[index])
-                                    .ifElse(
+                                    .lazyListWrapScrolling(
+                                        listState,
+                                        focused,
                                         index == 0,
-                                        Modifier.onKeyEvent {
-                                            if (focused && isUp(it) && it.type == KeyEventType.KeyDown) {
-                                                scope.launch {
-                                                    listState.animateScrollToItem(dialogItems.lastIndex)
-                                                    focusRequesters[dialogItems.lastIndex].tryRequestFocus()
-                                                }
-                                                return@onKeyEvent true
-                                            }
-                                            false
-                                        },
-                                    ).ifElse(
                                         index == dialogItems.lastIndex,
-                                        Modifier.onKeyEvent {
-                                            if (focused && isDown(it) && it.type == KeyEventType.KeyDown) {
-                                                scope.launch {
-                                                    listState.animateScrollToItem(0)
-                                                    focusRequesters[0].tryRequestFocus()
-                                                }
-                                                return@onKeyEvent true
-                                            }
-                                            false
-                                        },
+                                        focusRequesters[0],
+                                        focusRequesters[dialogItems.lastIndex],
                                     ),
                         )
                     }
@@ -671,12 +652,13 @@ fun resourceFor(type: MediaStreamType): Int =
 fun chooseStream(
     resources: Resources,
     streams: List<MediaStream>,
-    currentIndex: Int?,
+    streamChoice: StreamChoiceResult?,
     type: MediaStreamType,
     preferredSubtitleLanguage: String?,
     onClick: (Int) -> Unit,
 ): DialogParams {
     val filteredStreams = streams.filter { it.type == type }
+    val currentIndex = streamChoice?.stream?.index
     return DialogParams(
         fromLongClick = false,
         title = resources.getString(R.string.choose_stream, resources.getString(resourceFor(type))),
@@ -694,6 +676,16 @@ fun chooseStream(
                             },
                             supportingContent = {
                             },
+                            trailingContent =
+                                if (currentIndex == null && streamChoice != null) {
+                                    {
+                                        Text(
+                                            text = streamChoice.reason.description.getString(),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                             onClick = { onClick.invoke(TrackIndex.DISABLED) },
                         ),
                     )
@@ -739,6 +731,16 @@ fun chooseStream(
                                 supportingContent = {
                                     if (simpleStream.streamTitle != null) Text(text = simpleStream.displayTitle)
                                 },
+                                trailingContent =
+                                    if (currentIndex == stream.index) {
+                                        {
+                                            Text(
+                                                text = streamChoice.reason.description.getString(),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
                                 onClick = { onClick.invoke(stream.index) },
                             )
                         },

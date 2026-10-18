@@ -2,6 +2,7 @@ package com.github.damontecres.wholphin.services
 
 import android.content.Context
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
@@ -9,6 +10,7 @@ import com.github.damontecres.wholphin.data.model.HomePageSettings
 import com.github.damontecres.wholphin.data.model.HomeRowConfig
 import com.github.damontecres.wholphin.data.model.HomeRowViewOptions
 import com.github.damontecres.wholphin.data.model.SUPPORTED_HOME_PAGE_SETTINGS_VERSION
+import com.github.damontecres.wholphin.data.model.ServerUserConfig
 import com.github.damontecres.wholphin.data.model.createGenreDestination
 import com.github.damontecres.wholphin.data.model.createStudioDestination
 import com.github.damontecres.wholphin.data.model.dedupeAudioByAlbum
@@ -189,9 +191,8 @@ class HomeSettingsService
 
         /**
          * Decodes [HomePageSettings] from a [JsonElement] skipping any unknown/unparsable rows
-         *
-         * This is public only for testing
          */
+        @VisibleForTesting
         fun decode(element: JsonElement): HomePageSettings {
             val version = element.jsonObject["version"]?.jsonPrimitive?.intOrNull
             if (version == null || version > SUPPORTED_HOME_PAGE_SETTINGS_VERSION) {
@@ -247,7 +248,7 @@ class HomeSettingsService
                         settings.rows.mapIndexed { index, config ->
                             resolve(index, config)
                         }
-                    HomePageResolvedSettings(resolvedRows)
+                    HomePageResolvedSettings(userId, resolvedRows)
                 } else {
                     createDefault(userId)
                 }
@@ -258,12 +259,15 @@ class HomeSettingsService
         /**
          * Resolve the settings and set them to be the current settings
          */
-        suspend fun updateCurrent(settings: HomePageSettings) {
+        suspend fun updateCurrent(
+            userId: UUID,
+            settings: HomePageSettings,
+        ) {
             val resolvedRows =
                 settings.rows.mapIndexed { index, config ->
                     resolve(index, config)
                 }
-            val resolvedSettings = HomePageResolvedSettings(resolvedRows)
+            val resolvedSettings = HomePageResolvedSettings(userId, resolvedRows)
             currentSettings.update { resolvedSettings }
         }
 
@@ -314,7 +318,7 @@ class HomeSettingsService
                     ),
                 )
             val rowConfig = continueWatchingRow + includedIds
-            return HomePageResolvedSettings(rowConfig)
+            return HomePageResolvedSettings(userId, rowConfig)
         }
 
         /**
@@ -430,7 +434,7 @@ class HomeSettingsService
                                 null
                             }
                         }.flatten()
-                HomePageResolvedSettings(rowConfigs)
+                HomePageResolvedSettings(userId, rowConfigs)
             } else {
                 null
             }
@@ -598,7 +602,7 @@ class HomeSettingsService
             row: HomeRowConfig,
             scope: CoroutineScope,
             prefs: HomePagePreferences,
-            userDto: UserDto,
+            userDto: ServerUserConfig,
             libraries: List<Library>,
             limit: Int = prefs.maxItemsPerRow,
             isRefresh: Boolean,
@@ -806,6 +810,7 @@ class HomeSettingsService
                                 imageUrlService.getItemImageUrl(
                                     itemId = it.id,
                                     imageType = ImageType.THUMB,
+                                    tag = it.imageTags?.get(ImageType.THUMB),
                                 )
                             BaseItem(
                                 it,
@@ -1308,10 +1313,11 @@ data class HomeRowConfigDisplay(
  * @see HomePageSettings
  */
 data class HomePageResolvedSettings(
+    val userId: UUID,
     val rows: List<HomeRowConfigDisplay>,
 ) {
     companion object {
-        val EMPTY = HomePageResolvedSettings(listOf())
+        val EMPTY = HomePageResolvedSettings(UUID.randomUUID(), emptyList())
     }
 }
 
