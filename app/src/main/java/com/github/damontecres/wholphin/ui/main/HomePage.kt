@@ -296,6 +296,7 @@ fun HomePageContent(
             item = focusedItem,
             showLogo = showLogo,
             modifier = HeaderUtils.modifier,
+            isWatchHistoryRow = homeRows.getOrNull(position.row).isWatchHistory,
         )
     },
     onClickViewMore: (RowColumn, HomeRowLoadingState.Success) -> Unit = { _, _ -> },
@@ -473,6 +474,7 @@ fun HomePageContent(
                                                         cardModifier
                                                             .onFocusChanged { onFocus(it.isFocused) }
                                                             .onKeyEvent { onKey(it) },
+                                                    seriesUnplayedCounts = row.seriesUnplayedCounts,
                                                 )
                                             },
                                             showViewMore = showViewMore && row.showViewMore,
@@ -543,6 +545,7 @@ fun HomePageHeader(
     item: BaseItem?,
     showLogo: Boolean,
     modifier: Modifier = Modifier,
+    isWatchHistoryRow: Boolean = false,
 ) {
     val isEpisode = item?.type == BaseItemKind.EPISODE
     val title =
@@ -575,6 +578,7 @@ fun HomePageHeader(
         endsAt = item?.data?.endDate,
         showLogo = showLogo,
         logoImageUrl = rememberLogoUrl(item),
+        lastPlayedText = watchHistoryLastPlayedText(item, isWatchHistoryRow),
         modifier = modifier,
     )
 }
@@ -591,6 +595,7 @@ fun HomePageHeader(
     showLogo: Boolean,
     logoImageUrl: String?,
     modifier: Modifier = Modifier,
+    lastPlayedText: String? = null,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -612,6 +617,7 @@ fun HomePageHeader(
                 EpisodeName(subtitle)
             }
             QuickDetails(quickDetails, timeRemaining, endsAt = endsAt)
+            LastPlayedLine(lastPlayedText)
             val overviewModifier =
                 Modifier
                     .padding(0.dp)
@@ -641,6 +647,7 @@ fun HomePageCardContent(
     onLongClick: () -> Unit,
     viewOptions: HomeRowViewOptions,
     modifier: Modifier,
+    seriesUnplayedCounts: Map<UUID, Int> = emptyMap(),
 ) {
     when (item?.type) {
         BaseItemKind.GENRE -> {
@@ -692,13 +699,13 @@ fun HomePageCardContent(
                 }
             if (viewOptions.showTitles) {
                 BannerCardWithTitle(
-                    title = item?.title,
-                    subtitle = item?.subtitle,
+                    title = homeRowTitle(item),
+                    subtitle = homeRowSubtitle(item),
                     item = item,
                     aspectRatio = ratio,
                     imageType = imageType,
                     imageContentScale = scale,
-                    cornerText = item?.ui?.episodeUnplayedCornerText,
+                    cornerText = unplayedCornerText(item, viewOptions, seriesUnplayedCounts),
                     played = item?.data?.userData?.played ?: false,
                     favorite = item?.favorite ?: false,
                     playPercent =
@@ -717,7 +724,7 @@ fun HomePageCardContent(
                     aspectRatio = ratio,
                     imageType = imageType,
                     imageContentScale = scale,
-                    cornerText = item?.ui?.episodeUnplayedCornerText,
+                    cornerText = unplayedCornerText(item, viewOptions, seriesUnplayedCounts),
                     played = item?.data?.userData?.played ?: false,
                     favorite = item?.favorite ?: false,
                     playPercent =

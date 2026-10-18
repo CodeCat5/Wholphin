@@ -16,6 +16,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.data.model.HomeRowConfig
 import com.github.damontecres.wholphin.data.model.HomeRowViewOptions
 import com.github.damontecres.wholphin.data.model.maybeDedupeAudioByAlbum
 import com.github.damontecres.wholphin.data.model.maybeDedupeBySeries
@@ -32,6 +33,7 @@ import com.github.damontecres.wholphin.services.SuggestionService
 import com.github.damontecres.wholphin.services.SuggestionsResource
 import com.github.damontecres.wholphin.services.UserPreferencesService
 import com.github.damontecres.wholphin.services.deleteItem
+import com.github.damontecres.wholphin.services.fetchSeriesUnplayedCounts
 import com.github.damontecres.wholphin.ui.DEFAULT_PAGE_SIZE
 import com.github.damontecres.wholphin.ui.OneTimeLaunchedEffect
 import com.github.damontecres.wholphin.ui.data.AddPlaylistViewModel
@@ -148,6 +150,8 @@ class RecommendedViewModel
                                         viewOptions,
                                         // No single request backs a combined row, so there's no "view more" grid to show
                                         showViewMore = !row.combineContinueWatchingNextUp && items.size >= limit,
+                                        seriesUnplayedCounts =
+                                            fetchSeriesUnplayedCounts(api, viewOptions, serverRepository.currentUser?.id, items),
                                     )
                                 } catch (ex: Exception) {
                                     Timber.e(ex, "Exception fetching %s", title)
@@ -302,6 +306,7 @@ class RecommendedViewModel
                             title,
                             items,
                             viewOptions,
+                            rowType = HomeRowConfig.WatchHistory(),
                             showViewMore = items.size >= (limit ?: Int.MAX_VALUE),
                         )
                     } catch (ex: Exception) {
