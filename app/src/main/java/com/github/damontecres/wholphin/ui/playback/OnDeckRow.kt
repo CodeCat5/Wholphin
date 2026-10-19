@@ -52,7 +52,7 @@ fun OnDeckRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .height(192.dp)
                     .focusRestorer(focusRequester)
                     .onFocusChanged { onFocusChanged(it.hasFocus) },
         ) {
@@ -66,7 +66,7 @@ fun OnDeckRow(
                     item = item,
                     onClick = { onClickItem(item) },
                     onLongClick = {},
-                    imageHeight = 100.dp,
+                    imageHeight = 120.dp,
                     showImageOverlay = true,
                     interactionSource = interactionSource,
                     modifier =

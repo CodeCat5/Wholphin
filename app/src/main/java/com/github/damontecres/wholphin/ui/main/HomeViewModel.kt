@@ -1,4 +1,4 @@
-package com.github.damontecres.wholphin.ui.main
+﻿package com.github.damontecres.wholphin.ui.main
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
