@@ -91,7 +91,6 @@ import com.github.damontecres.wholphin.ui.playback.overlay.SkipSegmentButton
 import com.github.damontecres.wholphin.ui.playback.overlay.rememberSeekBarState
 import com.github.damontecres.wholphin.ui.preferences.subtitle.SubtitleSettings.applyTo
 import com.github.damontecres.wholphin.ui.preferences.subtitle.SubtitleSettings.calculateEdgeSize
-import com.github.damontecres.wholphin.ui.seasonEpisode
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.LoadingState
@@ -336,15 +335,9 @@ fun PlaybackPageContent(
         modifier
             .background(if (state.nextUp == null) Color.Black else MaterialTheme.colorScheme.background),
     ) {
-        val playerSize by
-            animateFloatAsState(
-                when {
-                    state.nextUp == null -> 1f
-                    // Leave extra room for the Just Played card + On Deck row below it
-                    state.onDeck.isNotEmpty() -> .32f
-                    else -> .6f
-                },
-            )
+        // Hide the frozen video surface entirely once Next Up is showing, rather than leaving a
+        // blank/black player area above the overlay.
+        val playerSize by animateFloatAsState(if (state.nextUp == null) 1f else 0f)
         Box(
             modifier =
                 Modifier
@@ -675,11 +668,8 @@ fun PlaybackPageContent(
                     }
                 }
                 NextUpEpisode(
-                    title =
-                        listOfNotNull(
-                            it.data.seasonEpisode,
-                            it.name,
-                        ).joinToString(" - "),
+                    title = it.title,
+                    subtitle = it.subtitle,
                     description = it.data.overview,
                     imageUrl = LocalImageUrlService.current.rememberImageUrl(it),
                     aspectRatio = it.aspectRatio ?: AspectRatios.WIDE,
@@ -693,11 +683,21 @@ fun PlaybackPageContent(
                     justPlayed = state.justPlayed,
                     onClickJustPlayed = {
                         state.justPlayed?.let { justPlayed ->
-                            viewModel.navigationManager.navigateTo(Destination.Playback(justPlayed.id, 0L))
+                            // justPlayed is already part of the current playlist, so switch to it
+                            // in place (reusing the existing player) instead of navigating to a
+                            // second, stacked Playback screen.
+                            scope.launch(ExceptionHandler()) {
+                                viewModel.cancelUpNextEpisode()
+                            }
+                            viewModel.playItemInPlaylist(justPlayed)
                         }
                     },
                     onDeck = state.onDeck,
                     onClickOnDeckItem = { item ->
+                        // This item isn't part of the current playlist, so start a fresh playback
+                        // screen for it, but pop the current one first so we don't stack two
+                        // Playback screens (and their players) on top of each other.
+                        viewModel.navigationManager.goBack()
                         viewModel.navigationManager.navigateTo(Destination.Playback(item))
                     },
                     onUpNextFocusChanged = { focused ->
@@ -715,7 +715,7 @@ fun PlaybackPageContent(
                             .padding(8.dp)
 //                                    .height(128.dp)
                             .fillMaxHeight(1 - playerSize)
-                            .fillMaxWidth(.66f)
+                            .fillMaxWidth(.8f)
                             .align(Alignment.BottomCenter)
                             .background(
                                 MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),

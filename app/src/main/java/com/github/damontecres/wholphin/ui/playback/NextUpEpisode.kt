@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,7 +61,6 @@ import com.github.damontecres.wholphin.ui.cards.SeasonCard
 import com.github.damontecres.wholphin.ui.dot
 import com.github.damontecres.wholphin.ui.formatDuration
 import com.github.damontecres.wholphin.ui.formatTime
-import com.github.damontecres.wholphin.ui.ifElse
 import com.github.damontecres.wholphin.ui.theme.WholphinTheme
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.ui.util.Clock
@@ -74,6 +76,7 @@ import kotlin.time.toJavaDuration
 @Composable
 fun NextUpEpisode(
     title: String?,
+    subtitle: String?,
     description: String?,
     imageUrl: String?,
     onClick: () -> Unit,
@@ -113,11 +116,8 @@ fun NextUpEpisode(
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier
-                        .padding(8.dp)
-                        .ifElse(onDeck.isNotEmpty(), Modifier.height(140.dp)),
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.padding(8.dp),
             ) {
                 if (justPlayed != null) {
                     SeasonCard(
@@ -128,34 +128,49 @@ fun NextUpEpisode(
                         showImageOverlay = true,
                     )
                 }
-                NextUpCard(
-                    imageUrl = imageUrl,
-                    onClick = onClick,
-                    timeLeft = timeLeft,
-                    interactionSource = interactionSource,
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(aspectRatio.coerceAtLeast(AspectRatios.MIN))
-//                            .fillMaxSize()
-//                            .weight(1f)
-                            .focusRequester(focusRequester),
-                )
+                val nextUpAspectRatio = aspectRatio.coerceAtLeast(AspectRatios.MIN)
+                val nextUpCardHeight = 110.dp
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.width(nextUpCardHeight * nextUpAspectRatio),
                 ) {
+                    NextUpCard(
+                        imageUrl = imageUrl,
+                        onClick = onClick,
+                        timeLeft = timeLeft,
+                        interactionSource = interactionSource,
+                        modifier =
+                            Modifier
+                                .height(nextUpCardHeight)
+                                .aspectRatio(nextUpAspectRatio)
+                                .focusRequester(focusRequester),
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = title ?: "",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier,
+                        modifier = Modifier.fillMaxWidth(),
                     )
+                    Text(
+                        text = subtitle ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f),
+                ) {
                     Text(
                         text = description ?: "",
                         style = MaterialTheme.typography.bodyMedium,
@@ -193,6 +208,7 @@ fun NextUpEpisode(
                 }
             }
             if (onDeck.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(32.dp))
                 OnDeckRow(
                     items = onDeck,
                     onClickItem = onClickOnDeckItem,
@@ -273,7 +289,8 @@ private fun NextUpEpisodePreview() {
                 LocalClock provides Clock(),
             ) {
                 NextUpEpisode(
-                    title = "Episode Title",
+                    title = "Series Title",
+                    subtitle = "S1E2 - Episode Title",
                     description =
                         "This is the description of the episode. It might be long. " +
                             "It might be very, very long and overflow the available space. " +
