@@ -284,7 +284,7 @@ fun PlaybackOverlay(
                                 .align(Alignment.BottomStart)
                                 .offsetByPercent(
                                     xPercentage = seekProgressPercent.coerceIn(0f, 1f),
-                                ).padding(bottom = controllerHeight - titleHeight - subtitleHeight),
+                                ).padding(bottom = (controllerHeight - titleHeight - subtitleHeight).coerceAtLeast(0.dp)),
                     ) {
                         TrickplayPreview(
                             seekProgressMs = seekProgressMs,
