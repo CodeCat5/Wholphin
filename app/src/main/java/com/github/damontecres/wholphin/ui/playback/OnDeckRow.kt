@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -36,8 +37,14 @@ fun OnDeckRow(
     onClickItem: (BaseItem) -> Unit,
     onFocusChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
-    val focusRequester = remember { FocusRequester() }
+    // `focusRequester` identifies the row itself, so external callers (e.g. pressing Down from
+    // the Up Next card) always land on a live node, even after the first item has scrolled out
+    // of view and been recycled. `firstItemFocusRequester` is only the focusRestorer fallback
+    // used the very first time focus enters the row; after that, focusRestorer remembers and
+    // restores whichever item was last focused.
+    val firstItemFocusRequester = remember { FocusRequester() }
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier,
@@ -47,13 +54,14 @@ fun OnDeckRow(
             style = MaterialTheme.typography.titleMedium,
         )
         LazyRow(
-            contentPadding = PaddingValues(vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(192.dp)
-                    .focusRestorer(focusRequester)
+                    .focusRequester(focusRequester)
+                    .focusRestorer(firstItemFocusRequester)
                     .onFocusChanged { onFocusChanged(it.hasFocus) },
         ) {
             itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
@@ -72,7 +80,9 @@ fun OnDeckRow(
                     modifier =
                         Modifier.ifElse(
                             index == 0,
-                            Modifier.focusRequester(focusRequester),
+                            Modifier
+                                .focusRequester(firstItemFocusRequester)
+                                .focusProperties { left = FocusRequester.Cancel },
                         ),
                 )
             }
