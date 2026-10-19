@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
@@ -95,6 +96,9 @@ fun NextUpEpisode(
     LaunchedEffect(isUpNextFocused) { onUpNextFocusChanged(isUpNextFocused) }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.tryRequestFocus() }
+    // Navigating down from the Up Next (or Just Played) card should always land on the first
+    // Continue Watching item, rather than Compose's default geometric nearest-neighbor guess.
+    val onDeckFocusRequester = remember { FocusRequester() }
     Box(
         modifier = modifier,
     ) {
@@ -126,6 +130,12 @@ fun NextUpEpisode(
                         onLongClick = {},
                         imageHeight = 90.dp,
                         showImageOverlay = true,
+                        modifier =
+                            Modifier.focusProperties {
+                                down = onDeckFocusRequester
+                                left = FocusRequester.Cancel
+                                up = FocusRequester.Cancel
+                            },
                     )
                 }
                 val nextUpAspectRatio = aspectRatio.coerceAtLeast(AspectRatios.MIN)
@@ -144,7 +154,12 @@ fun NextUpEpisode(
                             Modifier
                                 .height(nextUpCardHeight)
                                 .aspectRatio(nextUpAspectRatio)
-                                .focusRequester(focusRequester),
+                                .focusRequester(focusRequester)
+                                .focusProperties {
+                                    down = onDeckFocusRequester
+                                    up = FocusRequester.Cancel
+                                    if (justPlayed == null) left = FocusRequester.Cancel
+                                },
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
@@ -212,6 +227,7 @@ fun NextUpEpisode(
                 OnDeckRow(
                     items = onDeck,
                     onClickItem = onClickOnDeckItem,
+                    focusRequester = onDeckFocusRequester,
                 )
             }
         }
