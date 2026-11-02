@@ -673,10 +673,10 @@ fun PlaybackPageContent(
                     description = it.data.overview,
                     imageUrl = LocalImageUrlService.current.rememberImageUrl(it),
                     aspectRatio = it.aspectRatio ?: AspectRatios.WIDE,
-                    onClick = {
+                    onClick = { viaPlayButton ->
                         viewModel.reportInteraction()
                         controllerViewState.hideControls()
-                        viewModel.playNextUp()
+                        viewModel.playNextUp(viaPlayButton = viaPlayButton)
                     },
                     timeLeft = if (autoPlayEnabled) timeLeft.seconds else null,
                     runtime = it.data.runTimeTicks?.ticks,

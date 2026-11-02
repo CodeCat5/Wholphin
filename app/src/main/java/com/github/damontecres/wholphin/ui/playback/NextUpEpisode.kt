@@ -34,6 +34,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -80,7 +81,7 @@ fun NextUpEpisode(
     subtitle: String?,
     description: String?,
     imageUrl: String?,
-    onClick: () -> Unit,
+    onClick: (viaPlayButton: Boolean) -> Unit,
     timeLeft: Duration?,
     modifier: Modifier = Modifier,
     aspectRatio: Float = AspectRatios.WIDE,
@@ -237,14 +238,22 @@ fun NextUpEpisode(
 @Composable
 fun NextUpCard(
     imageUrl: String?,
-    onClick: () -> Unit,
+    onClick: (viaPlayButton: Boolean) -> Unit,
     timeLeft: Duration?,
     interactionSource: MutableInteractionSource,
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier,
-        onClick = onClick,
+        modifier =
+            modifier.onKeyEvent {
+                if (isPlayKeyUp(it)) {
+                    onClick.invoke(true)
+                    true
+                } else {
+                    false
+                }
+            },
+        onClick = { onClick.invoke(false) },
         interactionSource = interactionSource,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
