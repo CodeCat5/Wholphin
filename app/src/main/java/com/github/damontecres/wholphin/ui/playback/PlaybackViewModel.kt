@@ -198,7 +198,10 @@ class PlaybackViewModel
         private var subscribeJob: Job? = null
 
         private val isPlaylist = destination is Destination.PlaybackList
-        private val startedViaPlayButton = (destination as? Destination.Playback)?.startedViaPlayButton == true
+
+        // Mutable because playing the Next Up episode via the play button (rather than ok)
+        // should also disable auto-play for whatever comes after that episode.
+        private var startedViaPlayButton = (destination as? Destination.Playback)?.startedViaPlayButton == true
 
         val subtitleSearchState = MutableStateFlow(SubtitleSearchState())
 
@@ -1341,11 +1344,12 @@ class PlaybackViewModel
                         }
                 }
 
-        fun playNextUp() {
+        fun playNextUp(viaPlayButton: Boolean = false) {
             viewModelScope.launchDefault {
                 playlistMutex.withLock {
                     val state = state.value
                     if (state.hasNext) {
+                        startedViaPlayButton = viaPlayButton
                         cancelUpNextEpisode()
                         val nextIndex = state.playlistIndex + 1
                         val item = state.playlist.items[nextIndex]
