@@ -17,10 +17,10 @@ import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.ExtrasService
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
 import com.github.damontecres.wholphin.services.MediaManagementService
-import com.github.damontecres.wholphin.services.MediaReportService
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.PeopleFavorites
 import com.github.damontecres.wholphin.services.SeerrService
+import com.github.damontecres.wholphin.services.ServerReportService
 import com.github.damontecres.wholphin.services.StreamChoiceService
 import com.github.damontecres.wholphin.services.ThemeSongPlayer
 import com.github.damontecres.wholphin.services.TrailerService
@@ -62,7 +62,7 @@ class MovieViewModel
         val serverRepository: ServerRepository,
         val itemPlaybackRepository: ItemPlaybackRepository,
         val streamChoiceService: StreamChoiceService,
-        val mediaReportService: MediaReportService,
+        val serverReportService: ServerReportService,
         private val themeSongPlayer: ThemeSongPlayer,
         private val favoriteWatchManager: FavoriteWatchManager,
         private val peopleFavorites: PeopleFavorites,
@@ -223,11 +223,10 @@ class MovieViewModel
         ) {
             viewModelScope.launchIO {
                 val prefs = userPreferencesService.getCurrent()
-                val plc = streamChoiceService.getPlaybackLanguageChoice(item.data)
                 val result = itemPlaybackRepository.savePlayVersion(item.id, sourceId)
                 val chosen =
                     result?.let {
-                        itemPlaybackRepository.getChosenItemFromPlayback(item, result, plc, prefs)
+                        itemPlaybackRepository.getChosenItemFromPlayback(item, result, prefs)
                     }
                 _state.update { it.copy(chosenStreams = chosen) }
             }
@@ -241,7 +240,6 @@ class MovieViewModel
         ) {
             viewModelScope.launchIO {
                 val prefs = userPreferencesService.getCurrent()
-                val plc = streamChoiceService.getPlaybackLanguageChoice(item.data)
                 val result =
                     itemPlaybackRepository.saveTrackSelection(
                         item = item,
@@ -249,10 +247,7 @@ class MovieViewModel
                         trackIndex = trackIndex,
                         type = type,
                     )
-                val chosen =
-                    result?.let {
-                        itemPlaybackRepository.getChosenItemFromPlayback(item, result, plc, prefs)
-                    }
+                val chosen = itemPlaybackRepository.getChosenItemFromPlayback(item, result, prefs)
                 _state.update { it.copy(chosenStreams = chosen) }
             }
         }
