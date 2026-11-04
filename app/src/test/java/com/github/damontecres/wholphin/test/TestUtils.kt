@@ -4,12 +4,15 @@ import com.github.damontecres.wholphin.data.CurrentUser
 import com.github.damontecres.wholphin.data.model.JellyfinServer
 import com.github.damontecres.wholphin.data.model.JellyfinUser
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
+import com.ibm.icu.impl.Assert
 import io.mockk.MockKMatcherScope
 import org.jellyfin.sdk.model.UUID
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.NameGuidPair
 import org.jellyfin.sdk.model.api.UserDto
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 fun MockKMatcherScope.nonBlankString() = match<String> { it.isNotNullOrBlank() }
 
@@ -80,6 +83,23 @@ fun playlist(
         genreItems = genres,
     )
 
+/**
+ * Create a simple [BaseItemDto] of the specified type
+ */
+fun item(
+    type: BaseItemKind,
+    id: UUID = UUID.randomUUID(),
+    name: String = "Test $type",
+    genres: List<NameGuidPair>? = null,
+): BaseItemDto =
+    BaseItemDto(
+        id = id,
+        type = type,
+        name = name,
+        seriesId = null,
+        genreItems = genres,
+    )
+
 fun server(serverId: UUID = UUID.randomUUID()) = JellyfinServer(serverId, "test server", "http://localhost:8096", "10.11.11")
 
 fun user(
@@ -111,3 +131,33 @@ fun currentUser(
     server(serverId),
     user(userId),
 )
+
+/**
+ * Asserts that the object is not null and is type `T`
+ *
+ * Includes a [contract] to smart-cast the object to T
+ */
+@OptIn(ExperimentalContracts::class)
+inline fun <reified T : Any> assertIs(obj: Any?) {
+    contract {
+        returns() implies (obj is T)
+    }
+    assertNotNull(obj)
+    val result = T::class.isInstance(obj)
+    if (!result) {
+        Assert.fail("Expected type=${T::class.qualifiedName}, actual type= ${obj!!::class.qualifiedName} ")
+    }
+}
+
+/**
+ * Asserts that the object is not null
+ *
+ * Includes a [contract] to smart-cast the object to T
+ */
+@OptIn(ExperimentalContracts::class)
+fun assertNotNull(obj: Any?) {
+    contract {
+        returns() implies (obj != null)
+    }
+    org.junit.Assert.assertNotNull(obj)
+}

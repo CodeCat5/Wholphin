@@ -1,12 +1,17 @@
 package com.github.damontecres.wholphin.ui.setup
 
+import android.Manifest
 import android.content.res.Resources
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -62,11 +67,13 @@ import com.github.damontecres.wholphin.ui.components.ErrorMessage
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.TextButton
 import com.github.damontecres.wholphin.ui.dimAndBlur
-import com.github.damontecres.wholphin.ui.ifElse
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.rememberInt
+import com.github.damontecres.wholphin.ui.serverSupportedMessage
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.LoadingState
+import org.jellyfin.sdk.model.ServerVersion
+import timber.log.Timber
 
 @Composable
 fun SwitchServerContent(
@@ -96,6 +103,8 @@ private fun SwitchServerContentInternal(
     modifier: Modifier = Modifier,
 ) {
     val resources = LocalResources.current
+    val focusRequesters =
+        remember(state.servers.size) { List(state.servers.size + 1) { FocusRequester() } }
     var showAddServer by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf<JellyfinServer?>(null) }
     var focusedIndex by rememberInt(0)
@@ -139,10 +148,13 @@ private fun SwitchServerContentInternal(
                 val firstServerFocus = remember { FocusRequester() }
                 LaunchedEffect(state.loading) {
                     val state = state
-                    if (state.loading == LoadingState.Success && state.servers.isNotEmpty()) {
-                        firstServerFocus.tryRequestFocus()
-                    } else if (state.loading == LoadingState.Pending) {
-                        firstServerFocus.tryRequestFocus()
+                    when (state.loading) {
+                        is LoadingState.Error,
+                        LoadingState.Loading,
+                        LoadingState.Pending,
+                        -> Unit
+
+                        LoadingState.Success -> focusRequesters.firstOrNull()?.tryRequestFocus()
                     }
                 }
                 LazyRow(
@@ -183,10 +195,7 @@ private fun SwitchServerContentInternal(
                                 Modifier
                                     .onFocusChanged {
                                         if (it.isFocused) focusedIndex = index
-                                    }.ifElse(
-                                        index == 0,
-                                        Modifier.focusRequester(firstServerFocus),
-                                    ),
+                                    }.focusRequester(focusRequesters[index]),
                         )
                     }
                     // Add Server card - always rightmost
@@ -197,10 +206,7 @@ private fun SwitchServerContentInternal(
                                 Modifier
                                     .onFocusChanged {
                                         if (it.isFocused) focusedIndex = -1
-                                    }.ifElse(
-                                        state.servers.isEmpty(),
-                                        Modifier.focusRequester(firstServerFocus),
-                                    ),
+                                    }.focusRequester(focusRequesters.last()),
                         )
                     }
                 }
@@ -230,20 +236,7 @@ private fun SwitchServerContentInternal(
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter),
         ) { message ->
-
-            Text(
-                text = message ?: "",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(start = 32.dp, end = 32.dp, bottom = 32.dp)
-                        .align(Alignment.BottomCenter),
-            )
+            SwitchErrorMessage(message ?: "")
         }
 
         // Delete server dialog
@@ -294,19 +287,40 @@ private fun AddServerDialog(
     val state by viewModel.state.collectAsState()
     var showEnterAddress by remember { mutableStateOf(false) }
 
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { isGranted ->
+            if (isGranted) {
+                viewModel.discoverServers()
+            } else {
+                showEnterAddress = true
+            }
+        }
+
     LaunchedEffect(Unit) {
         viewModel.clearAddServerState()
         if (!showEnterAddress) {
-            viewModel.discoverServers()
+            if (viewModel.hasPermission) {
+                viewModel.discoverServers()
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
+                permissionLauncher.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+            } else {
+                Timber.w(
+                    "No ACCESS_LOCAL_NETWORK permission, but API <%s: %s",
+                    Build.VERSION_CODES.CINNAMON_BUN,
+                    Build.VERSION.SDK_INT,
+                )
+            }
         }
     }
 
-    val firstDiscoveredServerFocusRequester = remember { FocusRequester() }
+    val buttonFocusRequester = remember { FocusRequester() }
 
     // Default focus to first discovered server if available
-    LaunchedEffect(state.discoveredServers.isNotEmpty(), showEnterAddress) {
-        if (!showEnterAddress && state.discoveredServers.isNotEmpty()) {
-            firstDiscoveredServerFocusRequester.tryRequestFocus()
+    LaunchedEffect(showEnterAddress) {
+        if (!showEnterAddress) {
+            buttonFocusRequester.tryRequestFocus()
         }
     }
 
@@ -353,12 +367,8 @@ private fun AddServerDialog(
                             key = { state.discoveredServers[it].url },
                         ) { index ->
                             val server = state.discoveredServers[index]
-                            val focusRequester =
-                                if (index == 0) {
-                                    firstDiscoveredServerFocusRequester
-                                } else {
-                                    remember { FocusRequester() }
-                                }
+                            val focusRequester = remember { FocusRequester() }
+                            LaunchedEffect(Unit) { if (index == 0) focusRequester.tryRequestFocus() }
 
                             ListItem(
                                 enabled = true,
@@ -465,21 +475,38 @@ fun serverErrorMessage(
     server: ServerState?,
     resources: Resources,
 ): String? =
-    when {
-        server?.status is ServerConnectionStatus.Error -> {
-            server.status.message
-        }
-
-        server?.status is ServerConnectionStatus.Success &&
-            server.versionSupported == ServerVersionSupported.NOT_SUPPORTED -> {
-            resources.getString(R.string.server_version_not_supported) + ": ${server.status.systemInfo.version}"
-        }
-
-        server?.versionSupported == ServerVersionSupported.NOT_SUPPORTED -> {
-            resources.getString(R.string.server_version_not_supported)
-        }
-
-        else -> {
-            null
-        }
+    if (server == null || server.status == ServerConnectionStatus.Pending) {
+        null
+    } else if (server.status is ServerConnectionStatus.Success) {
+        resources.serverSupportedMessage(
+            server.versionSupported,
+            server.status.systemInfo.version
+                ?.let { ServerVersion.fromString(it) },
+        )
+    } else if (server.status is ServerConnectionStatus.Error) {
+        server.status.message
+    } else {
+        resources.serverSupportedMessage(
+            server.versionSupported,
+            null,
+        )
     }
+
+@Composable
+fun BoxScope.SwitchErrorMessage(message: String?) {
+    message?.let {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 32.dp, end = 32.dp, bottom = 32.dp)
+                    .align(Alignment.BottomCenter),
+        )
+    }
+}
