@@ -18,10 +18,10 @@ import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
 import com.github.damontecres.wholphin.services.FilterOptionCache
 import com.github.damontecres.wholphin.services.MediaManagementService
-import com.github.damontecres.wholphin.services.MediaReportService
 import com.github.damontecres.wholphin.services.NavDrawerService
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.RememberedTabService
+import com.github.damontecres.wholphin.services.ServerReportService
 import com.github.damontecres.wholphin.services.StreamChoiceService
 import com.github.damontecres.wholphin.services.UserPreferencesService
 import com.github.damontecres.wholphin.services.deleteItem
@@ -43,6 +43,7 @@ import com.github.damontecres.wholphin.ui.main.settings.Library
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.nav.NavDrawerItem
 import com.github.damontecres.wholphin.ui.showToast
+import com.github.damontecres.wholphin.ui.util.goToRandom
 import com.github.damontecres.wholphin.util.ApiRequestPager
 import com.github.damontecres.wholphin.util.BlockingList
 import com.github.damontecres.wholphin.util.DataLoadingState
@@ -89,7 +90,7 @@ class FavoritesViewModel
         private val userPreferencesService: UserPreferencesService,
         private val mediaManagementService: MediaManagementService,
         val streamChoiceService: StreamChoiceService,
-        val mediaReportService: MediaReportService,
+        val serverReportService: ServerReportService,
         private val filterOptionCache: FilterOptionCache,
         private val rememberedTabService: RememberedTabService,
     ) : ViewModel() {
@@ -590,7 +591,7 @@ class FavoritesViewModel
                 }
             }
 
-            override fun sendReportFor(itemId: UUID) = mediaReportService.sendReportFor(itemId)
+            override fun sendReportFor(itemId: UUID) = serverReportService.sendMediaReportFor(itemId)
 
             override fun updateBackdrop(item: BaseItem) {
                 viewModelScope.launchIO {
@@ -700,11 +701,25 @@ class FavoritesViewModel
                 viewModelScope.launchIO {
                     try {
                         collectionStateFor(type)?.let { collectionState ->
-                            val random =
-                                (collectionState.items.successValue as? BlockingList<BaseItem?>)?.randomBlocking()
-                            Timber.d("Got random item: %s", random?.id)
-                            random?.destination()?.let {
-                                navigateTo(random.destination())
+                            val list =
+                                collectionState.items.successValue as? BlockingList<BaseItem?>
+                            if (list != null) {
+                                goToRandom(
+                                    navigateTo = ::navigateTo,
+                                    parentId = libraryDisplayItemId(type),
+                                    filter =
+                                        collectionState.filter.copy(
+                                            includeItemTypes = listOf(type),
+                                        ),
+                                    sortAndDirection = collectionState.sortAndDirection,
+                                    recursive = true,
+                                    list = list,
+                                )
+                            } else {
+                                Timber.w(
+                                    "state.value.items is not successful: %s",
+                                    collectionState.items,
+                                )
                             }
                         }
                     } catch (ex: CancellationException) {
@@ -787,7 +802,9 @@ fun List<Library>.possibleFavoriteTypes(sort: Boolean) =
     flatMap { it.collectionType.baseItemKinds }
         .distinct()
         .filter { it in favoriteOptions }
-        .let { list ->
+        .let {
+            // No library for persons, so always include it
+            val list = it + listOf(BaseItemKind.PERSON)
             if (sort) {
                 list.sortedWith(compareBy { favoriteOptions.indexOf(it) })
             } else {
