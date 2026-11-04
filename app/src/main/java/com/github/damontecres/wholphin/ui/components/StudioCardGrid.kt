@@ -97,6 +97,7 @@ class StudioViewModel
                                         itemId = it.id,
                                         imageType = ImageType.THUMB,
                                         fillWidth = cardWidthPx,
+                                        tag = it.imageTags?.get(ImageType.THUMB),
                                     )
                                 Studio(
                                     id = it.id,
@@ -120,17 +121,18 @@ class StudioViewModel
 
         suspend fun positionOfLetter(letter: Char): Int =
             withContext(WholphinDispatchers.IO) {
-                val request =
-                    GetStudiosRequest(
-                        userId = serverRepository.currentUser?.id,
-                        parentId = itemId,
-                        nameLessThan = letter.toString(),
-                        limit = 0,
-                        enableTotalRecordCount = true,
-                        includeItemTypes = includeItemTypes,
-                    )
-                val result by GetStudiosRequestHandler.execute(api, request)
-                return@withContext result.totalRecordCount
+                GetStudiosRequestHandler.countMatching(
+                    api = api,
+                    request =
+                        GetStudiosRequest(
+                            userId = serverRepository.currentUser?.id,
+                            parentId = itemId,
+                            nameLessThan = letter.toString(),
+                            limit = 0,
+                            enableTotalRecordCount = true,
+                            includeItemTypes = includeItemTypes,
+                        ),
+                )
             }
     }
 

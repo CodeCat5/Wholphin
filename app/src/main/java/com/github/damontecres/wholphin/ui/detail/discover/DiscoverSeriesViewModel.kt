@@ -3,6 +3,7 @@ package com.github.damontecres.wholphin.ui.detail.discover
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.RelatedVideo
 import com.github.damontecres.wholphin.api.seerr.model.RequestPostRequest
 import com.github.damontecres.wholphin.api.seerr.model.RequestRequestIdPutRequest
@@ -20,6 +21,7 @@ import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.SeerrServerRepository
 import com.github.damontecres.wholphin.services.SeerrService
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
+import com.github.damontecres.wholphin.ui.launchDefault
 import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.showToast
@@ -45,6 +47,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.BaseItemKind
 import timber.log.Timber
 
 @HiltViewModel(assistedFactory = DiscoverSeriesViewModel.Factory::class)
@@ -69,6 +72,10 @@ class DiscoverSeriesViewModel
         val state: StateFlow<DiscoverSeriesState> = _state
 
         val userConfig = seerrServerRepository.current.map { it?.config }
+        val requestEnabled =
+            seerrServerRepository.current
+                .map { it?.requestTvEnabled ?: false }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, false)
         val request4kEnabled =
             seerrServerRepository.current
                 .map { it?.request4kTvEnabled ?: false }
@@ -102,7 +109,7 @@ class DiscoverSeriesViewModel
                     backdropService.submit(discoveredItem)
 
                     updateSeasonStatus(tv)
-                    updateCanCancel()
+                    updateAvailability()
 
                     viewModelScope.launchIO {
                         val rating =
@@ -162,6 +169,15 @@ class DiscoverSeriesViewModel
             navigationManager.navigateTo(destination)
         }
 
+        fun goTo(
+            mediaInfo: MediaInfo?,
+            type: BaseItemKind,
+        ) {
+            viewModelScope.launchDefault {
+                goToButtonDiscover(mediaInfo, type, context, navigationManager)
+            }
+        }
+
         private suspend fun updateSeasonStatus(tv: TvDetails) {
             if (request4kEnabled.first()) {
                 updateSeasonStatus(tv, true)
@@ -173,6 +189,7 @@ class DiscoverSeriesViewModel
             tv: TvDetails,
             is4k: Boolean,
         ) {
+            Timber.v("updateSeasonStatus: id=%s, is4k=%s", tv.id, is4k)
             val currentUserId = seerrServerRepository.currentUserId.first()
             val seasonStatus = mutableMapOf<Int, RequestStatus>()
             val seasonAvailability = mutableMapOf<Int, SeerrAvailability>()
@@ -213,7 +230,10 @@ class DiscoverSeriesViewModel
                                 seasonStatus[season.seasonNumber] = new
                             }
                             editable[season.seasonNumber] =
-                                currentUserId == req.requestedBy?.id && req.status == RequestStatus.PENDING.status
+                                currentUserId == req.requestedBy?.id && (
+                                    req.status == RequestStatus.PENDING.status ||
+                                        req.status == RequestStatus.DECLINED.status
+                                )
                         }
                     }
                 }
@@ -282,7 +302,7 @@ class DiscoverSeriesViewModel
             }
         }
 
-        private suspend fun updateCanCancel() {
+        private suspend fun updateAvailability() {
             val user = userConfig.firstOrNull()
             val canCancel =
                 canUserCancelRequest(
@@ -291,7 +311,32 @@ class DiscoverSeriesViewModel
                         ?.mediaInfo
                         ?.requests,
                 )
-            _state.update { it.copy(canCancelRequest = canCancel) }
+            val status =
+                state.value.tvSeries.successValue?.let { tv ->
+                    val overallStatus = SeerrAvailability.from(tv.mediaInfo?.status)
+                    if (overallStatus == SeerrAvailability.UNKNOWN) {
+                        val userRequests =
+                            tv.mediaInfo
+                                ?.requests
+                                ?.filter { it.requestedBy?.id == user?.id }
+                                .orEmpty()
+                        if (userRequests.any { RequestStatus.from(it.status) == RequestStatus.PENDING }) {
+                            SeerrAvailability.PENDING
+                        } else if (userRequests.any { RequestStatus.from(it.status) == RequestStatus.APPROVED }) {
+                            SeerrAvailability.PROCESSING
+                        } else {
+                            SeerrAvailability.UNKNOWN
+                        }
+                    } else {
+                        overallStatus
+                    }
+                }
+            _state.update {
+                it.copy(
+                    canCancelRequest = canCancel,
+                    availability = status ?: SeerrAvailability.UNKNOWN,
+                )
+            }
         }
 
         fun requestOnClick() {
@@ -374,7 +419,7 @@ class DiscoverSeriesViewModel
 
                     fetchAndSetItem().await()?.let {
                         updateSeasonStatus(it)
-                        updateCanCancel()
+                        updateAvailability()
                     }
                 }
             }
@@ -395,7 +440,7 @@ class DiscoverSeriesViewModel
 
                     fetchAndSetItem().await()?.let {
                         updateSeasonStatus(it)
-                        updateCanCancel()
+                        updateAvailability()
                     }
                 }
             }
@@ -414,4 +459,5 @@ data class DiscoverSeriesState(
     val canCancelRequest: Boolean = false,
     val profileLoading: LoadingState = LoadingState.Pending,
     val requestData: SeerrRequestData = SeerrRequestData(),
+    val availability: SeerrAvailability = SeerrAvailability.UNKNOWN,
 )

@@ -13,9 +13,10 @@ import androidx.media3.session.MediaSession
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.AudioItem
 import com.github.damontecres.wholphin.data.model.BaseItem
+import com.github.damontecres.wholphin.preferences.enabled
 import com.github.damontecres.wholphin.preferences.get
 import com.github.damontecres.wholphin.services.hilt.DefaultCoroutineScope
-import com.github.damontecres.wholphin.ui.DefaultItemFields
+import com.github.damontecres.wholphin.ui.DetailItemFields
 import com.github.damontecres.wholphin.ui.gt
 import com.github.damontecres.wholphin.ui.main.settings.MoveDirection
 import com.github.damontecres.wholphin.ui.onMain
@@ -108,7 +109,8 @@ class MusicService
         private suspend fun preferAc3Surround() =
             userPreferencesService
                 .getCurrent()
-                .appPreferences.experimentalPreferences.preferAc3Surround
+                .appPreferences.experimentalPreferences
+                .enabled { preferAc3Surround }
 
         /**
          * Start music playback
@@ -120,7 +122,11 @@ class MusicService
                 mutex.withLock {
                     if (mediaSession == null) {
                         Timber.i("Starting music MediaSession")
-                        mediaSession = MediaSession.Builder(context, player).build()
+                        mediaSession =
+                            MediaSession
+                                .Builder(context, player)
+                                .setCallback(TrustAllControllersCallback)
+                                .build()
                         activityTracker =
                             TrackActivityPlaybackListener(api, player) {
                                 state.value.currentItemId?.let { itemId ->
@@ -180,7 +186,7 @@ class MusicService
                             userId = serverRepository.currentUser?.id,
                             itemId = itemId,
                             limit = 200,
-                            fields = DefaultItemFields,
+                            fields = DetailItemFields,
                         ).content.items
                         .map { BaseItem(it, false) }
                 setQueue(items, false)
@@ -325,6 +331,7 @@ class MusicService
                     imageUrlService.getItemImageUrl(
                         itemId = albumId,
                         imageType = ImageType.PRIMARY,
+                        tag = audio.data.albumPrimaryImageTag,
                     )
                 }
             return MediaItem

@@ -1,7 +1,11 @@
 package com.github.damontecres.wholphin.ui.setup
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.R
@@ -46,6 +50,17 @@ class SwitchServerViewModel
         private val _state = MutableStateFlow(SwitchServerState())
         val state: StateFlow<SwitchServerState> = _state
 
+        val hasPermission: Boolean
+            get() =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_LOCAL_NETWORK,
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
+
         fun clearAddServerState() {
             _state.update { it.copy(addServerState = LoadingState.Pending) }
         }
@@ -82,6 +97,8 @@ class SwitchServerViewModel
                         result.systemInfo.version?.let { ServerVersion.fromString(it) }
                     if (serverVersion == null || serverVersion < WholphinApplication.minimumServerVersion) {
                         ServerVersionSupported.NOT_SUPPORTED
+                    } else if (serverVersion < WholphinApplication.newMinimumServerVersion) {
+                        ServerVersionSupported.NOT_SUPPORTED_IN_FUTURE
                     } else {
                         ServerVersionSupported.SUPPORTED
                     }
@@ -292,4 +309,5 @@ enum class ServerVersionSupported {
     SUPPORTED,
     NOT_SUPPORTED,
     UNKNOWN,
+    NOT_SUPPORTED_IN_FUTURE,
 }

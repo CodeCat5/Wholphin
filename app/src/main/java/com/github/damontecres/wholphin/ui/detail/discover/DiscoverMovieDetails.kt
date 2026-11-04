@@ -42,9 +42,8 @@ import com.github.damontecres.wholphin.data.model.DiscoverRating
 import com.github.damontecres.wholphin.data.model.LocalTrailer
 import com.github.damontecres.wholphin.data.model.RemoteTrailer
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
-import com.github.damontecres.wholphin.data.model.SeerrPermission
 import com.github.damontecres.wholphin.data.model.Trailer
-import com.github.damontecres.wholphin.data.model.hasPermission
+import com.github.damontecres.wholphin.data.model.canRequestMovies
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.SeerrUserConfig
 import com.github.damontecres.wholphin.services.TrailerService
@@ -54,6 +53,7 @@ import com.github.damontecres.wholphin.ui.cards.DiscoverPersonRow
 import com.github.damontecres.wholphin.ui.cards.ItemRow
 import com.github.damontecres.wholphin.ui.cards.SeasonCard
 import com.github.damontecres.wholphin.ui.components.ErrorMessage
+import com.github.damontecres.wholphin.ui.components.HeaderUtils
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialogInfo
@@ -64,7 +64,6 @@ import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
-import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 
 @Composable
 fun DiscoverMovieDetails(
@@ -84,13 +83,11 @@ fun DiscoverMovieDetails(
     }
     val state by viewModel.state.collectAsState()
     val userConfig by viewModel.userConfig.collectAsState(null)
+    val requestEnabled by viewModel.requestEnabled.collectAsState(false)
     val request4kEnabled by viewModel.request4kEnabled.collectAsState(false)
 
     var overviewDialog by remember { mutableStateOf<ItemDetailsDialogInfo?>(null) }
     var showRequestDialog by remember { mutableStateOf(false) }
-
-    val requestStr = stringResource(R.string.request)
-    val request4kStr = stringResource(R.string.request_4k)
 
     when (val st = state.movie) {
         is DataLoadingState.Error -> {
@@ -138,14 +135,7 @@ fun DiscoverMovieDetails(
                         )
                 },
                 goToOnClick = {
-                    movie.mediaInfo?.jellyfinMediaId?.toUUIDOrNull()?.let {
-                        viewModel.navigateTo(
-                            Destination.MediaItem(
-                                itemId = it,
-                                type = BaseItemKind.MOVIE,
-                            ),
-                        )
-                    }
+                    viewModel.goTo(movie.mediaInfo, BaseItemKind.MOVIE)
                 },
                 moreOnClick = {},
                 onLongClickPerson = { index, person -> },
@@ -160,6 +150,7 @@ fun DiscoverMovieDetails(
                 RequestMovieDialog(
                     loading = state.profileLoading,
                     data = state.requestData,
+                    requestEnabled = requestEnabled,
                     request4kEnabled = request4kEnabled,
                     movie = movie,
                     onSubmit = {
@@ -238,10 +229,11 @@ fun DiscoverMovieDetailsContent(
                         rating = rating,
                         bringIntoViewRequester = bringIntoViewRequester,
                         overviewOnClick = overviewOnClick,
+                        showLogo = preferences.appPreferences.interfacePreferences.showLogos,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(top = 32.dp, bottom = 16.dp),
+                                .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                     )
                     ExpandableDiscoverButtons(
                         availability =
@@ -259,7 +251,7 @@ fun DiscoverMovieDetailsContent(
                                 }
                             }
                         },
-                        canRequest = userConfig.hasPermission(SeerrPermission.REQUEST),
+                        canRequest = userConfig.canRequestMovies,
                         canCancel = canCancel,
                         trailers = trailers,
                         trailerOnClick = trailerOnClick,
