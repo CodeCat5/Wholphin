@@ -118,10 +118,6 @@ sealed interface PlaybackAction {
         val scale: ContentScale,
     ) : PlaybackAction
 
-    data class MaxBitrate(
-        val bitrate: Long?,
-    ) : PlaybackAction
-
     data object Previous : PlaybackAction
 
     data object Next : PlaybackAction
