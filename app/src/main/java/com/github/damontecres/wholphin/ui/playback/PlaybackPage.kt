@@ -283,10 +283,6 @@ fun PlaybackPageContent(
                 contentScale = it.scale
             }
 
-            is PlaybackAction.MaxBitrate -> {
-                viewModel.changeMaxBitrate(it.bitrate)
-            }
-
             PlaybackAction.ShowDebug -> {
                 showDebugInfo = !showDebugInfo
             }
@@ -785,7 +781,6 @@ fun PlaybackPageContent(
                     // TODO Passing through audio prevents changing playback speed
                     // See https://github.com/damontecres/Wholphin/issues/164
                     playbackSpeedEnabled = playerBackend == PlayerBackend.MPV || state.currentPlayback?.audioDecoder != null,
-                    maxBitrateOverride = state.maxBitrateOverride,
                 ),
             onDismissRequest = {
                 playbackDialog =
@@ -793,7 +788,6 @@ fun PlaybackPageContent(
                         // Go back to settings dialog
                         PlaybackDialogType.PLAYBACK_SPEED,
                         PlaybackDialogType.VIDEO_SCALE,
-                        PlaybackDialogType.QUALITY,
                         -> PlaybackDialogType.SETTINGS
 
                         else -> null

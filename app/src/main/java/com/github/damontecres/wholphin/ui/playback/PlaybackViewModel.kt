@@ -625,10 +625,6 @@ class PlaybackViewModel
 
         /**
          * Change which streams (ie audio or subtitle) are active
-         *
-         * @param allowDirectPlayFastPath whether an item that is already direct playing may
-         * switch tracks locally without asking the server again. Must be false when the request
-         * changes something only the server can decide, such as the max bitrate.
          */
         @OptIn(UnstableApi::class)
         internal suspend fun changeStreams(
@@ -639,7 +635,6 @@ class PlaybackViewModel
             positionMs: Long = 0,
             enableDirectPlay: Boolean = !this.forceTranscoding,
             enableDirectStream: Boolean = !this.forceTranscoding,
-            allowDirectPlayFastPath: Boolean = true,
         ): Unit =
             withContext(WholphinDispatchers.IO) {
                 val itemId = item.id
@@ -648,8 +643,7 @@ class PlaybackViewModel
                 trackChangeListener = null
 
                 state.value.currentPlayback?.let { currentPlayback ->
-                    if (allowDirectPlayFastPath &&
-                        currentPlayback.item.id == item.id &&
+                    if (currentPlayback.item.id == item.id &&
                         currentPlayback.playMethod == PlayMethod.DIRECT_PLAY &&
                         enableDirectPlay
                     ) {
@@ -674,9 +668,8 @@ class PlaybackViewModel
                 )
 
                 val maxBitrate =
-                    state.value.maxBitrateOverride
-                        ?: preferences.appPreferences.playbackPreferences.maxBitrate
-                            .takeIf { it > 0 } ?: AppPreference.DEFAULT_BITRATE
+                    preferences.appPreferences.playbackPreferences.maxBitrate
+                        .takeIf { it > 0 } ?: AppPreference.DEFAULT_BITRATE
                 val response by
                     api.mediaInfoApi
                         .getPostedPlaybackInfo(
@@ -1034,36 +1027,6 @@ class PlaybackViewModel
                     Timber.w("Trying to change subtitle, but currentPlayback is null")
                 }
             }
-
-        /**
-         * Change the maximum streaming bitrate for the rest of this playback session
-         *
-         * A cap below the file bitrate makes the server transcode instead of direct playing,
-         * which saves bandwidth when streaming remotely. Null restores the max bitrate
-         * preference. The override is not persisted.
-         */
-        fun changeMaxBitrate(bitrate: Long?) {
-            viewModelScope.launchIO {
-                val currentPlayback = state.value.currentPlayback
-                if (currentPlayback != null) {
-                    Timber.d("Changing max bitrate to %s", bitrate)
-                    _state.update { it.copy(maxBitrateOverride = bitrate) }
-
-                    changeStreams(
-                        item = currentItem.item,
-                        sourceId = currentPlayback.mediaSourceInfo.id,
-                        audioIndex = currentPlayback.audioIndex,
-                        subtitleIndex = currentPlayback.subtitleIndex,
-                        positionMs = onMain { player.currentPosition },
-                        // The server decides direct play vs transcode from the new cap, so the
-                        // fast path must not short circuit that decision
-                        allowDirectPlayFastPath = false,
-                    )
-                } else {
-                    Timber.w("Trying to change max bitrate, but currentPlayback is null")
-                }
-            }
-        }
 
         internal suspend fun saveTrackSelection(
             trackIndex: Int,
