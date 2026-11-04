@@ -179,7 +179,7 @@ fun HomePage(
                                             playlistViewModel.loadPlaylists()
                                             showPlaylistDialog = itemId
                                         },
-                                        onSendMediaInfo = viewModel.mediaReportService::sendReportFor,
+                                        onSendMediaInfo = viewModel.serverReportService::sendMediaReportFor,
                                         onDeleteItem = {
                                             viewModel.deleteItem(position, it)
                                         },
@@ -548,11 +548,30 @@ fun HomePageHeader(
     isWatchHistoryRow: Boolean = false,
 ) {
     val isEpisode = item?.type == BaseItemKind.EPISODE
-    val dto = item?.data
+    val title =
+        remember(item?.id) {
+            when (item?.type) {
+                BaseItemKind.EPISODE,
+                BaseItemKind.SEASON,
+                -> item.data.seriesName
+
+                else -> item?.title
+            }
+        }
+    val subtitle =
+        remember(item?.id) {
+            when (item?.type) {
+                BaseItemKind.SEASON,
+                BaseItemKind.EPISODE,
+                -> item.name
+
+                else -> null
+            }
+        }
     HomePageHeader(
-        title = homeRowTitle(item),
-        subtitle = homeRowHeaderSubtitle(item),
-        overview = dto?.overview,
+        title = title,
+        subtitle = subtitle,
+        overview = item?.data?.overview,
         overviewTwoLines = isEpisode,
         quickDetails = item?.ui?.quickDetails,
         timeRemaining = item?.timeRemainingOrRuntime,
